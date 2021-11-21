@@ -37,7 +37,7 @@ def make_parser():
     parser.add_argument(
         "-f",
         "--exp_file",
-        default="/home/lizhogn/YOLOX/exps/coco/yolox_s.py",
+        default="/home/zhognli/YOLOX/exps/coco/yolox_s.py",
         type=str,
         help="plz input your experiment description file",
     )

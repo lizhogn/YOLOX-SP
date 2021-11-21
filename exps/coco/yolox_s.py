@@ -14,9 +14,9 @@ class Exp(MyExp):
         self.exp_name = os.path.split(os.path.realpath(__file__))[1].split(".")[0]
 
         # Define yourself dataset path
-        self.data_dir = "/home/lizhogn/YOLOX/datasets/tiny-coco/small_coco"
-        self.train_ann = "/home/lizhogn/YOLOX/datasets/tiny-coco/small_coco/instances_train2017_small.json"
-        self.val_ann = "/home/lizhogn/YOLOX/datasets/tiny-coco/small_coco/instances_train2017_small.json"
+        self.data_dir = "/home/zhognli/YOLOX/datasets/tiny-coco/small_coco"
+        self.train_ann = "/home/zhognli/YOLOX/datasets/tiny-coco/small_coco/instances_train2017_small.json"
+        self.val_ann = "/home/zhognli/YOLOX/datasets/tiny-coco/small_coco/instances_train2017_small.json"
         self.train_img_name = "train_2017_small"
         self.val_img_name   = "train_2017_small"
 
