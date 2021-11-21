@@ -43,8 +43,12 @@ class Trainer:
         self.scaler = torch.cuda.amp.GradScaler(enabled=args.fp16)
         self.is_distributed = get_world_size() > 1
         self.rank = get_rank()
-        self.local_rank = get_local_rank()
-        self.device = "cuda:{}".format(self.local_rank)
+        if torch.cuda.is_available():
+            self.local_rank = get_local_rank()
+            self.device = "cuda:{}".format(self.local_rank)
+        else:
+            self.local_rank = -1
+            self.device = "cpu"
         self.use_model_ema = exp.ema
 
         # data/dataloader related attr
@@ -82,15 +86,20 @@ class Trainer:
             self.after_epoch()
 
     def train_in_iter(self):
-        for self.iter in range(self.max_iter):
+        # for self.iter in range(self.max_iter):
+        #     self.before_iter()
+        #     self.train_one_iter()
+        #     self.after_iter()
+        for self.iter, train_dict in enumerate(self.train_loader):
             self.before_iter()
-            self.train_one_iter()
+            self.train_one_iter(train_dict)
             self.after_iter()
 
-    def train_one_iter(self):
+    def train_one_iter(self, train_dict):
         iter_start_time = time.time()
 
-        inps, targets = self.prefetcher.next()
+        # inps, targets = self.prefetcher.next()
+        inps, targets, img_info, img_id = train_dict
         inps = inps.to(self.data_type)
         targets = targets.to(self.data_type)
         targets.requires_grad = False
@@ -149,7 +158,7 @@ class Trainer:
             cache_img=self.args.cache,
         )
         logger.info("init prefetcher, this might take one minute or less...")
-        self.prefetcher = DataPrefetcher(self.train_loader)
+        # self.prefetcher = DataPrefetcher(self.train_loader)
         # max_iter means iters per epoch
         self.max_iter = len(self.train_loader)
 

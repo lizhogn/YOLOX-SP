@@ -17,8 +17,8 @@ from yolox.utils import configure_nccl, configure_omp, get_num_devices
 
 def make_parser():
     parser = argparse.ArgumentParser("YOLOX train parser")
-    parser.add_argument("-expn", "--experiment-name", type=str, default=None)
-    parser.add_argument("-n", "--name", type=str, default=None, help="model name")
+    parser.add_argument("-expn", "--experiment-name", type=str, default="coco_detection")
+    parser.add_argument("-n", "--name", type=str, default="yolo-s", help="model name")
 
     # distributed
     parser.add_argument(
@@ -30,14 +30,14 @@ def make_parser():
         type=str,
         help="url used to set up distributed training",
     )
-    parser.add_argument("-b", "--batch-size", type=int, default=64, help="batch size")
+    parser.add_argument("-b", "--batch-size", type=int, default=1, help="batch size")
     parser.add_argument(
         "-d", "--devices", default=None, type=int, help="device for training"
     )
     parser.add_argument(
         "-f",
         "--exp_file",
-        default=None,
+        default="/home/lizhogn/YOLOX/exps/coco/yolox_s.py",
         type=str,
         help="plz input your experiment description file",
     )

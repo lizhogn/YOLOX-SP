@@ -35,6 +35,8 @@ class Exp(BaseExp):
         self.data_dir = None
         self.train_ann = "instances_train2017.json"
         self.val_ann = "instances_val2017.json"
+        self.train_img_name = None
+        self.val_img_name   = None
 
         # --------------- transform config ----------------- #
         self.mosaic_prob = 1.0
@@ -57,6 +59,7 @@ class Exp(BaseExp):
         self.no_aug_epochs = 15
         self.min_lr_ratio = 0.05
         self.ema = True
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         self.weight_decay = 5e-4
         self.momentum = 0.9
@@ -111,6 +114,7 @@ class Exp(BaseExp):
             dataset = COCODataset(
                 data_dir=self.data_dir,
                 json_file=self.train_ann,
+                name=self.train_img_name,
                 img_size=self.input_size,
                 preproc=TrainTransform(
                     max_labels=50,
@@ -163,7 +167,7 @@ class Exp(BaseExp):
         return train_loader
 
     def random_resize(self, data_loader, epoch, rank, is_distributed):
-        tensor = torch.LongTensor(2).cuda()
+        tensor = torch.LongTensor(2).to(device=self.device)
 
         if rank == 0:
             size_factor = self.input_size[1] * 1.0 / self.input_size[0]
@@ -243,7 +247,7 @@ class Exp(BaseExp):
         valdataset = COCODataset(
             data_dir=self.data_dir,
             json_file=self.val_ann if not testdev else "image_info_test-dev2017.json",
-            name="val2017" if not testdev else "test2017",
+            name=self.val_img_name,
             img_size=self.test_size,
             preproc=ValTransform(legacy=legacy),
         )
