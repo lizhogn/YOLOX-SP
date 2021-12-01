@@ -143,10 +143,10 @@ def _mirror(image, boxes, prob=0.5):
 
 
 def preproc(img, input_size, swap=(2, 0, 1)):
-    if len(img.shape) == 3:
+    if len(img.shape) == 3 and img.shape[2] == 3:
         padded_img = np.ones((input_size[0], input_size[1], 3), dtype=np.uint8) * 114
     else:
-        padded_img = np.ones(input_size, dtype=np.uint8) * 114
+        padded_img = np.ones((input_size[0], input_size[1]), dtype=np.uint8) * 114
 
     r = min(input_size[0] / img.shape[0], input_size[1] / img.shape[1])
     resized_img = cv2.resize(
@@ -156,7 +156,9 @@ def preproc(img, input_size, swap=(2, 0, 1)):
     ).astype(np.uint8)
     padded_img[: int(img.shape[0] * r), : int(img.shape[1] * r)] = resized_img
 
-    padded_img = padded_img.transpose(swap)
+    if len(img.shape) == 3:
+        padded_img = padded_img.transpose(swap)
+
     padded_img = np.ascontiguousarray(padded_img, dtype=np.float32)
     return padded_img, r
 
@@ -167,7 +169,14 @@ class TrainTransform:
         self.flip_prob = flip_prob
         self.hsv_prob = hsv_prob
 
-    def __call__(self, image, targets, input_dim):
+    def __call__(self, image, targets, input_dim, mask=None):
+        """
+            Inputs:
+                image (np.ndarray): shape=[img_h, img_w, 3]
+                targets (np.ndarray): shape=[max_len, 5]
+                input_dim (tuple): value=(img_h, img_w)
+                mask[optional] (np.ndarray): shape=[img_h, img_w, 1]
+        """
         boxes = targets[:, :4].copy()
         labels = targets[:, 4].copy()
         if len(boxes) == 0:
@@ -177,6 +186,8 @@ class TrainTransform:
 
         image_o = image.copy()
         targets_o = targets.copy()
+        if mask is not None:
+            mask_o = mask.copy()
         height_o, width_o, _ = image_o.shape
         boxes_o = targets_o[:, :4]
         labels_o = targets_o[:, 4]
@@ -185,9 +196,17 @@ class TrainTransform:
 
         if random.random() < self.hsv_prob:
             augment_hsv(image)
-        image_t, boxes = _mirror(image, boxes, self.flip_prob)
-        height, width, _ = image_t.shape
-        image_t, r_ = preproc(image_t, input_dim)
+        if mask is None:
+            image_t, boxes = _mirror(image, boxes, self.flip_prob)
+            height, width, _ = image_t.shape
+            image_t, r_ = preproc(image_t, input_dim)
+        else:
+            img_mask = np.concatenate([image, mask], axis=2)
+            img_mask_t, boxes = _mirror(img_mask, boxes, self.flip_prob)
+            image_t, mask_t = img_mask_t[:, :, :3], img_mask_t[:, :, 3]
+            image_t, r_ = preproc(image_t, input_dim)
+            mask_t,  r_ = preproc(mask_t, input_dim)
+            
         # boxes [xyxy] 2 [cx,cy,w,h]
         boxes = xyxy2cxcywh(boxes)
         boxes *= r_
@@ -198,6 +217,8 @@ class TrainTransform:
 
         if len(boxes_t) == 0:
             image_t, r_o = preproc(image_o, input_dim)
+            if mask is not None:
+                mask_t, r_o = preproc(mask_o, input_dim)
             boxes_o *= r_o
             boxes_t = boxes_o
             labels_t = labels_o
@@ -210,7 +231,11 @@ class TrainTransform:
             : self.max_labels
         ]
         padded_labels = np.ascontiguousarray(padded_labels, dtype=np.float32)
-        return image_t, padded_labels
+        
+        if mask is not None:
+            return image_t, mask_t, padded_labels
+        else:
+            return image_t, padded_labels
 
 
 class ValTransform:
