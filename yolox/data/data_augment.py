@@ -261,11 +261,16 @@ class ValTransform:
         self.legacy = legacy
 
     # assume input is cv2 img for now
-    def __call__(self, img, res, input_size):
+    def __call__(self, img, res, input_size, mask=None):
         img, _ = preproc(img, input_size, self.swap)
+        if mask is not None:
+            mask, _ = preproc(mask, input_size)
         if self.legacy:
             img = img[::-1, :, :].copy()
             img /= 255.0
             img -= np.array([0.485, 0.456, 0.406]).reshape(3, 1, 1)
             img /= np.array([0.229, 0.224, 0.225]).reshape(3, 1, 1)
-        return img, np.zeros((1, 5))
+        if mask is None:
+            return img, np.zeros((1, 5))
+        else:
+            return img, mask, np.zeros((1, 5))

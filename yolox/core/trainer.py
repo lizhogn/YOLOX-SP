@@ -99,7 +99,7 @@ class Trainer:
         iter_start_time = time.time()
 
         # inps, targets = self.prefetcher.next()
-        inps, targets, img_info, img_id = train_dict
+        inps, mask, targets, _ = train_dict
         inps = inps.to(dtype=self.data_type, device=self.device)
         targets = targets.to(dtype=self.data_type, device=self.device)
         targets.requires_grad = False

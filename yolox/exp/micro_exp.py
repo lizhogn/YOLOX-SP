@@ -8,6 +8,9 @@ import random
 import torch
 import torch.distributed as dist
 import torch.nn as nn
+from torch.utils.data.dataloader import DataLoader
+
+from yolox.models.unet_head import HeatMapHead
 
 from .base_exp import BaseExp
 
@@ -72,7 +75,7 @@ class Exp(BaseExp):
         self.nmsthre = 0.65
 
     def get_model(self):
-        from yolox.models import YOLOX, YOLOPAFPN, YOLOXHead
+        from yolox.models import YOLOX, YOLOPAFPN, YOLOXHead, UnetHead
 
         def init_yolo(M):
             for m in M.modules():
@@ -81,13 +84,22 @@ class Exp(BaseExp):
                     m.momentum = 0.03
 
         if getattr(self, "model", None) is None:
-            in_channels = [256, 512, 1024]
-            backbone = YOLOPAFPN(self.depth, self.width, in_channels=in_channels, act=self.act)
-            head = YOLOXHead(self.num_classes, self.width, in_channels=in_channels, act=self.act)
-            self.model = YOLOX(backbone, head)
+            in_channels = [64, 128, 256, 512, 1024]
+            backbone = YOLOPAFPN(self.depth, 
+                                self.width, 
+                                in_features=("stem", "dark2", "dark3", "dark4", "dark5"),
+                                in_channels=[64, 128, 256, 512, 1024],
+                                act=self.act)
+            det_head = YOLOXHead(num_classes=self.num_classes,
+                                width=1,
+                                strides=[8, 16, 32],
+                                in_channels=[256, 512, 1024],
+                                act="silu")
+            mask_head = HeatMapHead(num_class=1, in_channel=in_channels[0])
+            self.model = YOLOX(backbone, det_head=det_head, mask_head=mask_head)
 
         self.model.apply(init_yolo)
-        self.model.head.initialize_biases(1e-2)
+        self.model.det_head.initialize_biases(1e-2)
         return self.model
 
     def get_data_loader(
@@ -96,9 +108,6 @@ class Exp(BaseExp):
         from yolox.data import (
             VOCDetSegDataset,
             TrainTransform,
-            YoloBatchSampler,
-            DataLoader,
-            InfiniteSampler,
             MosaicDetection,
             worker_init_reset_seed,
         )
@@ -119,40 +128,30 @@ class Exp(BaseExp):
                                         hsv_prob=self.hsv_prob)
                                     )
 
-        dataset = MosaicDetection(
-            dataset,
-            mosaic=not no_aug,
-            img_size=self.input_size,
-            preproc=TrainTransform(
-                max_labels=50,
-                flip_prob=self.flip_prob,
-                hsv_prob=self.hsv_prob),
-            degrees=self.degrees,
-            translate=self.translate,
-            mosaic_scale=self.mosaic_scale,
-            mixup_scale=self.mixup_scale,
-            shear=self.shear,
-            enable_mixup=self.enable_mixup,
-            mosaic_prob=self.mosaic_prob,
-            mixup_prob=self.mixup_prob,
-        )
+        # dataset = MosaicDetection(
+        #     dataset,
+        #     mosaic=not no_aug,
+        #     img_size=self.input_size,
+        #     preproc=TrainTransform(
+        #         max_labels=50,
+        #         flip_prob=self.flip_prob,
+        #         hsv_prob=self.hsv_prob),
+        #     degrees=self.degrees,
+        #     translate=self.translate,
+        #     mosaic_scale=self.mosaic_scale,
+        #     mixup_scale=self.mixup_scale,
+        #     shear=self.shear,
+        #     enable_mixup=self.enable_mixup,
+        #     mosaic_prob=self.mosaic_prob,
+        #     mixup_prob=self.mixup_prob,
+        # )
 
         self.dataset = dataset
 
         if is_distributed:
             batch_size = batch_size // dist.get_world_size()
 
-        sampler = InfiniteSampler(len(self.dataset), seed=self.seed if self.seed else 0)
-
-        batch_sampler = YoloBatchSampler(
-            sampler=sampler,
-            batch_size=batch_size,
-            drop_last=False,
-            mosaic=not no_aug,
-        )
-
         dataloader_kwargs = {"num_workers": self.data_num_workers, "pin_memory": True}
-        dataloader_kwargs["batch_sampler"] = batch_sampler
 
         # Make sure each process has different random seed, especially for 'fork' method.
         # Check https://github.com/pytorch/pytorch/issues/63311 for more details.
