@@ -46,7 +46,7 @@ class YOLOX(nn.Module):
                 "total_loss": total_loss,
                 "iou_loss": iou_loss,
                 "l1_loss": l1_loss,
-                "conf_loss": conf_loss,
+                "conf_loss": conf_loss, 
                 "cls_loss": cls_loss,
                 "mask_loss": mask_loss,
                 "num_fg": num_fg,

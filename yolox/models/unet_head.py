@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from yolox.utils import bboxes_iou
+from yolox.utils.boxes import xyxy2xywh
 
 from .losses import IOUloss
 from torch.nn import MSELoss
@@ -66,6 +67,7 @@ class HeatMapHead(nn.Module):
     ):
         super().__init__()
         self.outc = OutConv(in_channel, num_class)
+        self.mse = MSELoss(reduction="mean")
     
     def forward(self, xin, target_mask=None):
         pred_mask = self.outc(xin)
@@ -76,7 +78,7 @@ class HeatMapHead(nn.Module):
             return loss
     
     def get_losses(self, preds, targets):
-        mask_loss = MSELoss(preds, targets)
+        mask_loss = self.mse(preds, targets)
         return mask_loss
 
 
@@ -147,6 +149,9 @@ class OutConv(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(OutConv, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
+        self.activate = nn.LeakyReLU()
 
     def forward(self, x):
-        return self.conv(x)
+        x = self.conv(x)
+        x = self.activate(x)
+        return x

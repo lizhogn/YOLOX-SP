@@ -99,15 +99,16 @@ class Trainer:
         iter_start_time = time.time()
 
         # inps, targets = self.prefetcher.next()
-        inps, mask, targets, _ = train_dict
+        inps, masks, targets, _ = train_dict
         inps = inps.to(dtype=self.data_type, device=self.device)
         targets = targets.to(dtype=self.data_type, device=self.device)
+        masks = masks.to(dtype=self.data_type, device=self.device)
         targets.requires_grad = False
         inps, targets = self.exp.preprocess(inps, targets, self.input_size)
         data_end_time = time.time()
 
         with torch.cuda.amp.autocast(enabled=self.amp_training):
-            outputs = self.model(inps, targets)
+            outputs = self.model(inps, targets, masks)
 
         loss = outputs["total_loss"]
 

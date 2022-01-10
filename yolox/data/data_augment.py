@@ -206,6 +206,7 @@ class TrainTransform:
             image_t, mask_t = img_mask_t[:, :, :3], img_mask_t[:, :, 3]
             image_t, r_ = preproc(image_t, input_dim)
             mask_t,  r_ = preproc(mask_t, input_dim)
+            mask_t = mask_t[np.newaxis, :, :]
             
         # boxes [xyxy] 2 [cx,cy,w,h]
         boxes = xyxy2cxcywh(boxes)
@@ -224,7 +225,6 @@ class TrainTransform:
             labels_t = labels_o
 
         labels_t = np.expand_dims(labels_t, 1)
-
         targets_t = np.hstack((labels_t, boxes_t))
         padded_labels = np.zeros((self.max_labels, 5))
         padded_labels[range(len(targets_t))[: self.max_labels]] = targets_t[
