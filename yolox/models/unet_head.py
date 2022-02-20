@@ -74,6 +74,8 @@ class HeatMapHead(nn.Module):
         if target_mask is None:
             return pred_mask
         else:
+            if pred_mask.shape != target_mask.shape:
+                print("{}--{}".format(pred_mask.shape, target_mask.shape))
             loss = self.get_losses(pred_mask, target_mask)
             return loss
     
@@ -149,7 +151,8 @@ class OutConv(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(OutConv, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
-        self.activate = nn.LeakyReLU()
+        # self.activate = nn.LeakyReLU()
+        self.activate = nn.Sigmoid()
 
     def forward(self, x):
         x = self.conv(x)

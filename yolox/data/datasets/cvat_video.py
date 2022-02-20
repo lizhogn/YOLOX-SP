@@ -14,9 +14,9 @@ from yolox.evaluators.voc_eval import voc_eval
 from .datasets_wrapper import Dataset
 # from .voc_classes import VOC_CLASSES
 
-class VOCDetSegDataset(Dataset):
+class CVATVideoDataset(Dataset):
     """
-    VOC Detection Dataset Object
+    CVAT Video Dataset
 
     input is image, target is annotation
 
@@ -49,41 +49,72 @@ class VOCDetSegDataset(Dataset):
         self.annotations = self._load_annotations()
         
     def _load_annotations(self):
-        """parser the xml annotation file"""
+        """parser the xml annotation file
+        Output annotation format:
+            {
+                "0": {
+                    "img_path": "path/to/img",
+                    "bboxes": [lists of bboxes],
+                    "points": [lists of points],
+                    "bboxes_id": [list of bboxes identity],
+                    "points_id": [list of points identity]
+                },
+                "1": {
+                    ...
+                },...
+            }
+
+        """
         # step1: load the xml file
         xml_root = ET.parse(self.anno_path).getroot()
-        anno_list = []
-        img_lost  = []
-        for children in xml_root.iter("image"):
-            print(children.tag, ":", children.attrib)
-            img_attrib = children.attrib
-            img_name = img_attrib["name"]
-            img_path = os.path.join(self.img_dir, img_name)
-            if os.path.exists(img_path):
-                img_attrib["img_path"] = img_path
-            else:
-                img_lost.append(img_path)
-                continue
-            img_attrib["bboxes"] = []
-            img_attrib["points"] = []
-            for box in children.iter("box"):
-                box_attrib = box.attrib
-                img_attrib["bboxes"].append([
-                    int(float(box_attrib["xtl"])),
-                    int(float(box_attrib["ytl"])),
-                    int(float(box_attrib["xbr"])),
-                    int(float(box_attrib["ybr"]))
-                ])
+        anno_data = {}
 
-            for points in children.iter("points"):
-                points_str = points.attrib["points"]
-                p1, p2 = points_str.split(";")
-                p1 = [int(float(p)) for p in p1.split(",")]
-                p2 = [int(float(p)) for p in p2.split(",")]
-                img_attrib["points"].append([*p1, *p2])
-            anno_list.append(img_attrib)
-        return anno_list
-    
+        # step2: parse the xml file
+        for obj in xml_root.iter("track"):
+            track_id = obj.attrib["id"]
+            track_label = obj.attrib["label"]
+            if track_label == "microtubule":
+                iter_label = "box"
+            elif track_label == "pole":
+                iter_label = "points"
+            else:
+                continue
+            for frame in obj.iter(iter_label):
+                frame_id = frame.attrib["frame"]
+                img_name = "frame_{:0>6d}.PNG".format(int(frame_id))
+                is_outside = True if frame.attrib["outside"] == "1" else False
+
+                # save anno
+                if not is_outside:
+                    if frame_id not in anno_data:
+                        anno_data[frame_id] = {
+                            "img_name": img_name,
+                            "bboxes": [],
+                            "points": [],
+                            "bboxes_id": [],
+                            "points_id": []
+                        }
+                    if iter_label == "box":
+                        # bboxes
+                        x1, y1 = int(float(frame.attrib["xtl"])), int(float(frame.attrib["ytl"]))
+                        x2, y2 = int(float(frame.attrib["xbr"])), int(float(frame.attrib["ybr"]))
+                        anno_data[frame_id]["bboxes"].append([x1, y1, x2, y2])
+                        anno_data[frame_id]["bboxes_id"].append(track_id)
+                    else:
+                        # points
+                        points = frame.attrib["points"].split(";")
+                        if len(points) < 2:
+                            continue
+                        x1, y1 = [int(float(x)) for x in points[0].split(",")]
+                        x2, y2 = [int(float(x)) for x in points[1].split(",")]
+                        anno_data[frame_id]["points"].append([x1, y1, x2, y2])
+                        anno_data[frame_id]["points_id"].append(track_id)
+        
+        # step3: sort the dict by the key
+        anno_data = dict(sorted(anno_data.items(), key=lambda x: int(x[0])))
+
+        return list(anno_data.values())
+
     def __len__(self):
         return len(self.annotations)
 
@@ -106,9 +137,12 @@ class VOCDetSegDataset(Dataset):
         '''
 
         cur_anno = self.annotations[idx]
+        img_name = cur_anno["img_name"]
+        img_path = os.path.join(self.img_dir, img_name)
+        img, hw_origin, hw_resize = self.load_image(img_path)
         
         # load the img
-        img, hw_origin, hw_resize = self.load_image(idx)
+        img, hw_origin, hw_resize = self.load_image(img_path)
         
         # load bboxes
         bboxes = np.asarray(cur_anno["bboxes"], dtype=np.float32)
@@ -125,10 +159,12 @@ class VOCDetSegDataset(Dataset):
             # concat the image and mask together
             img, mask, bboxes = self.preproc(img, bboxes, self.input_dim, mask)
 
-        return img, mask, bboxes
+        return img, mask, bboxes, points
 
     def _mask_generate(self, points, img_size):
         mask = np.zeros(shape=img_size, dtype=np.float32)
+        if len(points) == 0:
+            return mask
         points = np.concatenate([points[:, :2], points[:, 2:]], axis=0).astype(np.int32)
         mask[points[:, 1], points[:, 0]] = 1.0
         # gaussian filter
@@ -136,10 +172,9 @@ class VOCDetSegDataset(Dataset):
         mask_blur = cv2.GaussianBlur(mask, gauss_kernel, 1.3)
         return 255 * mask_blur / mask_blur.max()
 
-    def load_image(self, idx):
-        path = self.annotations[idx]["img_path"]
-        im = cv2.imread(path)  # BGR
-        assert im is not None, f'Image Not Found {path}'
+    def load_image(self, img_path):
+        im = cv2.imread(img_path)  # BGR
+        assert im is not None, f'Image Not Found {img_path}'
         h0, w0 = im.shape[:2]  # orig hw
         img_size = self.img_size[0]
         r = img_size / max(h0, w0)  # ratio
@@ -173,10 +208,16 @@ class VOCDetSegDataset(Dataset):
 if __name__ == "__main__":
     xml_file = "/home/zhognli/YOLOX/datasets/sample2/annotations.xml"
     img_dir  = "/home/zhognli/YOLOX/datasets/sample2/images"
-    dataset = VOCDetSegDataset(img_dir=img_dir, anno_path=xml_file,)
-    img, mask, bbox, points = dataset[0]
-    print(img.shape)
-    print(mask.shape)
-    print(bbox.shape)
-    print(points.shape)
-    dataset.visual_data_sample(0)
+    dataset = CVATVideoDataset(img_dir=img_dir, anno_path=xml_file)
+    # img, mask, bbox, points = dataset[14]
+    # print(img.shape)
+    # print(mask.shape)
+    # print(bbox.shape)
+    # print(points.shape)
+    # dataset.visual_data_sample()
+
+    # dataset self checking
+    for idx in range(len(dataset)):
+        img, mask, bbox, points = dataset[idx]
+        print(idx)
+        print("{}_{}".format(img.shape, mask.shape))

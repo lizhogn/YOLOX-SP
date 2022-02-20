@@ -8,3 +8,4 @@ from .datasets_wrapper import ConcatDataset, Dataset, MixConcatDataset
 from .mosaicdetection import MosaicDetection
 from .voc import VOCDetection
 from .microtube import VOCDetSegDataset
+from .cvat_video import CVATVideoDataset

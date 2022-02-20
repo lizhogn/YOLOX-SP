@@ -35,10 +35,10 @@ class Exp(BaseExp):
         self.multiscale_range = 5
         # You can uncomment this line to specify a multiscale range
         # self.random_size = (14, 26)
-        self.train_img_dir = "/home/zhognli/YOLOX/datasets/cvat_example/task_test-2021_11_23_14_42_29-cvat for images 1.1/images"
-        self.train_anno_path = "/home/zhognli/YOLOX/datasets/cvat_example/task_test-2021_11_23_14_42_29-cvat for images 1.1/annotations.xml"
-        self.val_img_dir = ""
-        self.val_anno_path = ""
+        self.train_img_dir = "/home/zhognli/YOLOX/datasets/sample2/images"
+        self.train_anno_path = "/home/zhognli/YOLOX/datasets/sample2/annotations.xml"
+        self.val_img_dir = self.train_img_dir
+        self.val_anno_path = self.train_anno_path
 
         # --------------- transform config ----------------- #
         self.mosaic_prob = 1.0
@@ -75,7 +75,7 @@ class Exp(BaseExp):
         self.nmsthre = 0.65
 
     def get_model(self):
-        from yolox.models import YOLOX, YOLOPAFPN, YOLOXHead, UnetHead
+        from yolox.models import YOLOX, YOLOPAFPN, YOLOXHead, HeatMapHead
 
         def init_yolo(M):
             for m in M.modules():
@@ -106,7 +106,7 @@ class Exp(BaseExp):
         self, batch_size, is_distributed, no_aug=False, cache_img=False
     ):
         from yolox.data import (
-            VOCDetSegDataset,
+            CVATVideoDataset,
             TrainTransform,
             MosaicDetection,
             worker_init_reset_seed,
@@ -119,7 +119,7 @@ class Exp(BaseExp):
         local_rank = get_local_rank()
 
         with wait_for_the_master(local_rank):
-            dataset = VOCDetSegDataset(img_dir=self.train_img_dir, 
+            dataset = CVATVideoDataset(img_dir=self.train_img_dir, 
                                     anno_path=self.train_anno_path,
                                     img_size=self.input_size,
                                     preproc=TrainTransform(
@@ -182,16 +182,19 @@ class Exp(BaseExp):
         input_size = (tensor[0].item(), tensor[1].item())
         return input_size
 
-    def preprocess(self, inputs, targets, tsize):
+    def preprocess(self, inputs, targets, masks, tsize):
         scale_y = tsize[0] / self.input_size[0]
         scale_x = tsize[1] / self.input_size[1]
         if scale_x != 1 or scale_y != 1:
             inputs = nn.functional.interpolate(
                 inputs, size=tsize, mode="bilinear", align_corners=False
             )
+            masks = nn.functional.interpolate(
+                masks, size=tsize, mode="bilinear", align_corners=False
+            )
             targets[..., 1::2] = targets[..., 1::2] * scale_x
             targets[..., 2::2] = targets[..., 2::2] * scale_y
-        return inputs, targets
+        return inputs, targets, masks
 
     def get_optimizer(self, batch_size):
         if "optimizer" not in self.__dict__:

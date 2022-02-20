@@ -72,12 +72,14 @@ class Trainer:
 
     def train(self):
         self.before_train()
-        try:
-            self.train_in_epoch()
-        except Exception:
-            raise
-        finally:
-            self.after_train()
+        # try:
+        #     self.train_in_epoch()
+        # except Exception:
+        #     raise
+        # finally:
+        #     self.after_train()
+        self.train_in_epoch()
+        self.after_train()
 
     def train_in_epoch(self):
         for self.epoch in range(self.start_epoch, self.max_epoch):
@@ -100,17 +102,18 @@ class Trainer:
 
         # inps, targets = self.prefetcher.next()
         inps, masks, targets, _ = train_dict
-        inps = inps.to(dtype=self.data_type, device=self.device)
+        inps = inps.to(dtype=self.data_type, device=self.device) / 255.0
         targets = targets.to(dtype=self.data_type, device=self.device)
-        masks = masks.to(dtype=self.data_type, device=self.device)
+        masks = masks.to(dtype=self.data_type, device=self.device) / 255.0
         targets.requires_grad = False
-        inps, targets = self.exp.preprocess(inps, targets, self.input_size)
+        inps, targets, masks = self.exp.preprocess(inps, targets, masks, self.input_size)
         data_end_time = time.time()
 
         with torch.cuda.amp.autocast(enabled=self.amp_training):
             outputs = self.model(inps, targets, masks)
 
         loss = outputs["total_loss"]
+        print(loss)
 
         self.optimizer.zero_grad()
         self.scaler.scale(loss).backward()
