@@ -18,78 +18,36 @@ class YOLOPAFPN(nn.Module):
         self,
         depth=1.0,
         width=1.0,
-        in_features=("stem", "dark2", "dark3", "dark4", "dark5"),
-        in_channels=[64, 128, 256, 512, 1024],
+        in_features=("dark3", "dark4", "dark5"),
+        in_channels=[256, 512, 1024],
         depthwise=False,
         act="silu",
     ):
         super().__init__()
-        self.backbone = CSPDarknet(depth, width, in_features, depthwise=depthwise, act=act)
+        self.backbone = CSPDarknet(depth, width, depthwise=depthwise, act=act, out_features=in_features)
         self.in_features = in_features
         self.in_channels = in_channels
         Conv = DWConv if depthwise else BaseConv
 
-        self.upsample = nn.Upsample(scale_factor=2, mode="bilinear")
+        self.upsample = nn.Upsample(scale_factor=2, mode="nearest")
         self.lateral_conv0 = BaseConv(
-            int(in_channels[4] * width), int(in_channels[3] * width), 1, 1, act=act
+            int(in_channels[2] * width), int(in_channels[1] * width), 1, 1, act=act
         )
         self.C3_p4 = CSPLayer(
-            int(2 * in_channels[3] * width),
-            int(in_channels[3] * width),
-            round(3 * depth),
-            False,
-            depthwise=depthwise,
-            act=act,
-        )  # cat
-        self.C3_p3 = CSPLayer(
-            int(2 * in_channels[2] * width),
-            int(in_channels[2] * width),
-            round(3 * depth),
-            False,
-            depthwise=depthwise,
-            act=act
-        )
-        self.C3_p2 = CSPLayer(
             int(2 * in_channels[1] * width),
             int(in_channels[1] * width),
             round(3 * depth),
             False,
             depthwise=depthwise,
-            act=act
-        )
-        self.C3_p1 = CSPLayer(
-            int(2 * in_channels[0] * width),
-            int(in_channels[0] * width),
-            round(3 * depth),
-            False,
-            depthwise=depthwise,
-            act=act
-        )
-        self.C3_p0 = CSPLayer(
-            int(in_channels[0] * width),
-            int(in_channels[0] * width),
-            round(3 * depth),
-            False,
-            depthwise=depthwise,
-            act=act
-        )
+            act=act,
+        )  # cat
 
         self.reduce_conv1 = BaseConv(
-            int(in_channels[3] * width), int(in_channels[2] * width), 1, 1, act=act
-        )
-        self.reduce_conv2 = BaseConv(
-            int(in_channels[2] * width), int(in_channels[1] * width), 1, 1, act=act
-        )
-        self.reduce_conv3 = BaseConv(
             int(in_channels[1] * width), int(in_channels[0] * width), 1, 1, act=act
         )
-        self.reduce_conv4 = BaseConv(
-            int(in_channels[0] * width), int(in_channels[0] * width / 2), 1, 1, act=act
-        )
-
         self.C3_p3 = CSPLayer(
-            int(2 * in_channels[2] * width),
-            int(in_channels[2] * width),
+            int(2 * in_channels[0] * width),
+            int(in_channels[0] * width),
             round(3 * depth),
             False,
             depthwise=depthwise,
@@ -98,11 +56,11 @@ class YOLOPAFPN(nn.Module):
 
         # bottom-up conv
         self.bu_conv2 = Conv(
-            int(in_channels[2] * width), int(in_channels[2] * width), 3, 2, act=act
+            int(in_channels[0] * width), int(in_channels[0] * width), 3, 2, act=act
         )
         self.C3_n3 = CSPLayer(
-            int(2 * in_channels[2] * width),
-            int(in_channels[3] * width),
+            int(2 * in_channels[0] * width),
+            int(in_channels[1] * width),
             round(3 * depth),
             False,
             depthwise=depthwise,
@@ -111,16 +69,49 @@ class YOLOPAFPN(nn.Module):
 
         # bottom-up conv
         self.bu_conv1 = Conv(
-            int(in_channels[3] * width), int(in_channels[3] * width), 3, 2, act=act
+            int(in_channels[1] * width), int(in_channels[1] * width), 3, 2, act=act
         )
         self.C3_n4 = CSPLayer(
-            int(2 * in_channels[3] * width),
-            int(in_channels[4] * width),
+            int(2 * in_channels[1] * width),
+            int(in_channels[2] * width),
             round(3 * depth),
             False,
             depthwise=depthwise,
             act=act,
         )
+
+        # fpn layer for mask head
+        self.reduce_conv2 = BaseConv(
+            int(2 * in_channels[0] * width), int(128), 1, 1, act=act
+        )
+        self.reduce_conv3 = BaseConv(
+            int(128), int(64), 1, 1, act=act
+        )
+        self.C3_p2 = CSPLayer(
+            int(192),
+            int(128),
+            round(3),
+            False,
+            depthwise=depthwise,
+            act=act,
+        ) 
+        self.C3_p1 = CSPLayer(
+            int(128),
+            int(64),
+            round(3),
+            False,
+            depthwise=depthwise,
+            act=act,
+        )
+        self.C3_p0 = CSPLayer(
+            int(64),
+            int(64),
+            round(3),
+            False,
+            depthwise=depthwise,
+            act=act,
+        ) 
+        
 
     def forward(self, input):
         """
@@ -134,41 +125,37 @@ class YOLOPAFPN(nn.Module):
         #  backbone
         out_features = self.backbone(input)
         features = [out_features[f] for f in self.in_features]
-        [x4, x3, x2, x1, x0] = features
+        [x3, x2, x1, x0] = features
 
-        fpn_out0 = self.lateral_conv0(x0)       # 1024->512/32
-        f_out0 = self.upsample(fpn_out0)        # 512/16
-        f_out0 = torch.cat([f_out0, x1], 1)     # 512->1024/16
-        f_out0 = self.C3_p4(f_out0)             # 1024->512/16
+        fpn_out0 = self.lateral_conv0(x0)  # 1024->512/32
+        f_out0 = self.upsample(fpn_out0)  # 512/16
+        f_out0 = torch.cat([f_out0, x1], 1)  # 512->1024/16
+        f_out0 = self.C3_p4(f_out0)  # 1024->512/16
 
-        fpn_out1 = self.reduce_conv1(f_out0)    # 512->256/16
-        f_out1 = self.upsample(fpn_out1)        # 256/8
-        f_out1 = torch.cat([f_out1, x2], 1)     # 256->512/8
-        pan_out2 = self.C3_p3(f_out1)           # 512->256/8
+        fpn_out1 = self.reduce_conv1(f_out0)  # 512->256/16
+        f_out1 = self.upsample(fpn_out1)  # 256/8
+        f_out1 = torch.cat([f_out1, x2], 1)  # 256->512/8
+        pan_out2 = self.C3_p3(f_out1)  # 512->256/8
 
-        p_out1 = self.bu_conv2(pan_out2)        # 256->256/16
+        p_out1 = self.bu_conv2(pan_out2)  # 256->256/16
         p_out1 = torch.cat([p_out1, fpn_out1], 1)  # 256->512/16
-        pan_out1 = self.C3_n3(p_out1)           # 512->512/16
+        pan_out1 = self.C3_n3(p_out1)  # 512->512/16
 
-        p_out0 = self.bu_conv1(pan_out1)        # 512->512/32
+        p_out0 = self.bu_conv1(pan_out1)  # 512->512/32
         p_out0 = torch.cat([p_out0, fpn_out0], 1)  # 512->1024/32
-        pan_out0 = self.C3_n4(p_out0)           # 1024->1024/32
+        pan_out0 = self.C3_n4(p_out0)  # 1024->1024/32
 
-        # U-net feature
-        fpn_out2 = self.reduce_conv2(pan_out2)    # 256 -> 128/8
-        f_out2 = self.upsample(fpn_out2)        # 128/4
-        f_out2 = torch.cat([f_out2, x3], 1)     # 128 -> 256/4
-        pan_out3 = self.C3_p2(f_out2)           # 256 -> 128/4
-        
-        fpn_out3 = self.reduce_conv3(pan_out3)    # 128 -> 64/4
-        f_out3 = self.upsample(fpn_out3)        # 64/2
-        f_out3 = torch.cat([f_out3, x4], 1)     # 64 -> 128/2
-        pan_out4 = self.C3_p1(f_out3)           # 128 -> 64/2
- 
-        f_out4 = self.upsample(pan_out4)        # 64/1
-        pan_out5 = self.C3_p0(f_out4)           # 64 -> 64/1
+        # fpn for mask head
+        fpn_out2 = self.reduce_conv2(f_out1)    # 256/8 -> 128/8
+        f_out2 = self.upsample(fpn_out2)    # 128/8 -> 128/4
+        f_out2 = torch.cat([f_out2, x3], 1)     # 128/4 -> 256/4
+        mask_4 = self.C3_p2(f_out2)     # 192/4 -> 128/4
 
-        det_fea_map = (pan_out2, pan_out1, pan_out0)
-        mask_fea_map = pan_out5
+        # mask_2 = self.upsample(mask_4) # 64/4 -> 64/2
+        mask_2 = self.C3_p1(mask_4)     # 128/2 -> 64/2
 
-        return det_fea_map, mask_fea_map
+        # mask = self.upsample(mask_2)    # 32/2 -> 32/1
+        mask = self.C3_p0(mask_2)         # 64/1 -> 64/1
+
+        outputs = (pan_out2, pan_out1, pan_out0)
+        return outputs, mask

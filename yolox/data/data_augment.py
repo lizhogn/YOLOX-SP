@@ -134,19 +134,21 @@ def random_affine(
     return img, targets
 
 
-def _mirror(image, boxes, prob=0.5):
+def _mirror(image, boxes, mask=None, prob=0.5):
     _, width, _ = image.shape
     if random.random() < prob:
         image = image[:, ::-1]
+        if mask is not None:
+            mask = mask[:, ::-1]
         boxes[:, 0::2] = width - boxes[:, 2::-2]
-    return image, boxes
+    return image, mask, boxes
 
 
 def preproc(img, input_size, swap=(2, 0, 1)):
     if len(img.shape) == 3:
-        padded_img = np.ones((input_size[0], input_size[1], 3), dtype=np.uint8) * 114
+        padded_img = np.ones((input_size[0], input_size[1], 3), dtype=np.uint8) * 0
     else:
-        padded_img = np.ones(input_size, dtype=np.uint8) * 114
+        padded_img = np.ones(input_size, dtype=np.uint8) * 0
 
     r = min(input_size[0] / img.shape[0], input_size[1] / img.shape[1])
     resized_img = cv2.resize(
@@ -161,7 +163,7 @@ def preproc(img, input_size, swap=(2, 0, 1)):
     return padded_img, r
 
 def preproc_mask(img, input_size):
-    padded_img = np.ones((input_size[0], input_size[1]), dtype=np.uint8) * 114
+    padded_img = np.zeros((input_size[0], input_size[1]), dtype=np.uint8)
     
     r = min(input_size[0] / img.shape[0], input_size[1] / img.shape[1])
     resized_img = cv2.resize(
@@ -190,9 +192,14 @@ class TrainTransform:
         """
         boxes = targets[:, :4].copy()
         labels = targets[:, 4].copy()
+        if mask is not None:
+            mask_input_dim = [max(mask.shape), max(mask.shape)]
         if len(boxes) == 0:
             targets = np.zeros((self.max_labels, 5), dtype=np.float32)
             image, r_o = preproc(image, input_dim)
+            if mask is not None:
+                mask, r_o_m = preproc(mask, mask_input_dim)
+                return image, mask, targets
             return image, targets
 
         image_o = image.copy()
@@ -212,11 +219,13 @@ class TrainTransform:
             height, width, _ = image_t.shape
             image_t, r_ = preproc(image_t, input_dim)
         else:
-            img_mask = np.concatenate([image, mask], axis=2)
-            img_mask_t, boxes = _mirror(img_mask, boxes, self.flip_prob)
-            image_t, mask_t = img_mask_t[:, :, :3], img_mask_t[:, :, 3]
+            # img_mask = np.concatenate([image, mask], axis=2)
+            # img_mask_t, boxes = _mirror(img_mask, boxes, self.flip_prob)
+            # image_t, mask_t = img_mask_t[:, :, :3], img_mask_t[:, :, 3]
+
+            image_t, mask_t, boxes = _mirror(image, boxes, mask, self.flip_prob)
             image_t, r_ = preproc(image_t, input_dim)
-            mask_t,  r_ = preproc_mask(mask_t, input_dim)
+            mask_t,  r_ = preproc_mask(mask_t, mask_input_dim)
             mask_t = mask_t[np.newaxis, :, :]
             
         # boxes [xyxy] 2 [cx,cy,w,h]

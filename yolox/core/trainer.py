@@ -8,10 +8,12 @@ import time
 from loguru import logger
 
 import torch
+import numpy as np
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
 
 from yolox.data import DataPrefetcher
+from yolox.data.data_augment import ValTransform
 from yolox.utils import (
     MeterBuffer,
     ModelEMA,
@@ -55,6 +57,7 @@ class Trainer:
         self.data_type = torch.float16 if args.fp16 else torch.float32
         self.input_size = exp.input_size
         self.best_ap = 0
+        self.val_proproc = ValTransform(legacy=False)
 
         # metric record
         self.meter = MeterBuffer(window_size=exp.print_interval)
@@ -72,12 +75,6 @@ class Trainer:
 
     def train(self):
         self.before_train()
-        # try:
-        #     self.train_in_epoch()
-        # except Exception:
-        #     raise
-        # finally:
-        #     self.after_train()
         self.train_in_epoch()
         self.after_train()
 
@@ -101,10 +98,10 @@ class Trainer:
         iter_start_time = time.time()
 
         # inps, targets = self.prefetcher.next()
-        inps, masks, targets, _ = train_dict
-        inps = inps.to(dtype=self.data_type, device=self.device) / 255.0
+        inps, masks, targets = train_dict
+        inps = inps.to(dtype=self.data_type, device=self.device)
         targets = targets.to(dtype=self.data_type, device=self.device)
-        masks = masks.to(dtype=self.data_type, device=self.device) / 255.0
+        masks = masks.to(dtype=self.data_type, device=self.device)/255.0
         targets.requires_grad = False
         inps, targets, masks = self.exp.preprocess(inps, targets, masks, self.input_size)
         data_end_time = time.time()
@@ -113,7 +110,7 @@ class Trainer:
             outputs = self.model(inps, targets, masks)
 
         loss = outputs["total_loss"]
-        print(loss)
+        # print(loss)
 
         self.optimizer.zero_grad()
         self.scaler.scale(loss).backward()
@@ -215,9 +212,13 @@ class Trainer:
     def after_epoch(self):
         self.save_ckpt(ckpt_name="latest")
 
-        if (self.epoch + 1) % self.exp.eval_interval == 0:
-            all_reduce_norm(self.model)
-            self.evaluate_and_save_model()
+        # if (self.epoch) % self.exp.eval_interval == 0:
+        #     all_reduce_norm(self.model)
+        #     self.evaluate_and_save_model()
+        # pass
+
+        # evaluate the model
+        self.evaluate_mask_model()
 
     def before_iter(self):
         pass
@@ -240,7 +241,7 @@ class Trainer:
             )
             loss_meter = self.meter.get_filtered_meter("loss")
             loss_str = ", ".join(
-                ["{}: {:.1f}".format(k, v.latest) for k, v in loss_meter.items()]
+                ["{}: {:.3f}".format(k, v.latest) for k, v in loss_meter.items()]
             )
 
             time_meter = self.meter.get_filtered_meter("time")
@@ -340,3 +341,31 @@ class Trainer:
                 self.file_name,
                 ckpt_name,
             )
+    
+    def evaluate_mask_model(self):
+        import cv2
+        import matplotlib.pyplot as plt
+        img_path = "/home/zhognli/YOLOX/datasets/sample2/images/frame_000036.PNG"
+        img_raw = cv2.imread(img_path)
+        # height, width = img.shape[:2]
+        
+        ratio = min(640 / img_raw.shape[0], 640 / img_raw.shape[1])
+        
+        img, _ = self.val_proproc(img_raw, None, (640, 640))
+        img = torch.from_numpy(img).unsqueeze(0)
+        img = img.float().cuda()
+
+        self.model.eval()
+        with torch.no_grad():
+            outputs, mask = self.model(img)
+            mask = mask.cpu().squeeze().numpy()
+        cmap = plt.get_cmap('jet')
+        mask_rgb = np.delete(cmap(mask), 3, 2)
+        self.model.train()
+        self.tblogger.add_image("mask", mask_rgb, self.epoch, dataformats="HWC")
+        self.tblogger.add_image("origin", img_raw, self.epoch, dataformats="HWC")
+        
+            
+        
+        
+        

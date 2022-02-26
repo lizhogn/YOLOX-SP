@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from yolox.utils import bboxes_iou
 from yolox.utils.boxes import xyxy2xywh
 
-from .losses import IOUloss
+from .losses import IOUloss, FocalLoss
 from torch.nn import MSELoss
 from .network_blocks import BaseConv, DWConv
 
@@ -68,6 +68,7 @@ class HeatMapHead(nn.Module):
         super().__init__()
         self.outc = OutConv(in_channel, num_class)
         self.mse = MSELoss(reduction="mean")
+        self.focal_loss = FocalLoss()
     
     def forward(self, xin, target_mask=None):
         pred_mask = self.outc(xin)
@@ -76,13 +77,8 @@ class HeatMapHead(nn.Module):
         else:
             if pred_mask.shape != target_mask.shape:
                 print("{}--{}".format(pred_mask.shape, target_mask.shape))
-            loss = self.get_losses(pred_mask, target_mask)
+            loss = self.mse(pred_mask, target_mask)
             return loss
-    
-    def get_losses(self, preds, targets):
-        mask_loss = self.mse(preds, targets)
-        return mask_loss
-
 
 class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
@@ -150,11 +146,13 @@ class Up(nn.Module):
 class OutConv(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(OutConv, self).__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
+        self.conv1 = nn.Conv2d(in_channels, in_channels, kernel_size=1)
+        self.conv2 = nn.Conv2d(in_channels, out_channels, kernel_size=1)
         # self.activate = nn.LeakyReLU()
         self.activate = nn.Sigmoid()
 
     def forward(self, x):
-        x = self.conv(x)
-        x = self.activate(x)
+        x = self.conv1(x)
+        x = self.conv2(x)
+        # x = self.activate(x)
         return x

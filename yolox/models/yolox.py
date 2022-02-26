@@ -41,7 +41,8 @@ class YOLOX(nn.Module):
             )
             mask_loss = self.mask_head(mask_features, target_mask)
             # mask_loss = torch.tensor([0])
-            total_loss = det_loss + mask_loss
+            total_loss = mask_loss
+            # total_loss = det_loss + mask_loss
             # total_loss = det_loss
             loss_outputs = {
                 "total_loss": total_loss,

@@ -84,18 +84,18 @@ class Exp(BaseExp):
                     m.momentum = 0.03
 
         if getattr(self, "model", None) is None:
-            in_channels = [64, 128, 256, 512, 1024]
+            in_channels = [256, 512, 1024]
             backbone = YOLOPAFPN(self.depth, 
                                 self.width, 
-                                in_features=("stem", "dark2", "dark3", "dark4", "dark5"),
-                                in_channels=[64, 128, 256, 512, 1024],
+                                in_features=("dark2", "dark3", "dark4", "dark5"),
+                                in_channels=[256, 512, 1024],
                                 act=self.act)
             det_head = YOLOXHead(num_classes=self.num_classes,
-                                width=1,
+                                width=self.width,
                                 strides=[8, 16, 32],
                                 in_channels=[256, 512, 1024],
-                                act="silu")
-            mask_head = HeatMapHead(num_class=1, in_channel=in_channels[0])
+                                act=self.act)
+            mask_head = HeatMapHead(num_class=1, in_channel=64)
             self.model = YOLOX(backbone, det_head=det_head, mask_head=mask_head)
 
         self.model.apply(init_yolo)
@@ -151,7 +151,10 @@ class Exp(BaseExp):
         if is_distributed:
             batch_size = batch_size // dist.get_world_size()
 
-        dataloader_kwargs = {"num_workers": self.data_num_workers, "pin_memory": True}
+        dataloader_kwargs = {"batch_size": batch_size, 
+                            "num_workers": self.data_num_workers, 
+                            "pin_memory": True,
+                            "shuffle": True}
 
         # Make sure each process has different random seed, especially for 'fork' method.
         # Check https://github.com/pytorch/pytorch/issues/63311 for more details.
@@ -240,9 +243,9 @@ class Exp(BaseExp):
         return scheduler
 
     def get_eval_loader(self, batch_size, is_distributed, testdev=False, legacy=False):
-        from yolox.data import VOCDetSegDataset, ValTransform
+        from yolox.data import CVATVideoDataset, ValTransform
 
-        valdataset = VOCDetSegDataset(img_dir=self.val_img_dir, 
+        valdataset = CVATVideoDataset(img_dir=self.val_img_dir, 
                                 anno_path=self.val_anno_path,
                                 img_size=self.input_size,
                                 preproc=ValTransform(legacy=legacy))

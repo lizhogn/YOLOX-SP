@@ -152,23 +152,29 @@ class CVATVideoDataset(Dataset):
         # load points
         points = np.asarray(cur_anno["points"], dtype=np.float32)
         points = self._norm_bboxes(points, old_size=hw_origin, new_size=hw_resize)
-        mask = self._mask_generate(points, hw_resize)
+        mask = self._mask_generate(points, hw_resize, scale=4)
         mask = mask[:, :, np.newaxis]
 
         if self.preproc is not None:
             # concat the image and mask together
             img, mask, bboxes = self.preproc(img, bboxes, self.input_dim, mask)
 
-        return img, mask, bboxes, points
+        return img, mask, bboxes
 
-    def _mask_generate(self, points, img_size):
-        mask = np.zeros(shape=img_size, dtype=np.float32)
+    def _mask_generate(self, points, img_size, scale=1):
+        mask_h = int(img_size[0] / scale)
+        mask_w = int(img_size[1] / scale)
+        mask_size = (mask_h, mask_w)
+        mask = np.zeros(shape=mask_size, dtype=np.float32)
         if len(points) == 0:
             return mask
+        points = points / scale
         points = np.concatenate([points[:, :2], points[:, 2:]], axis=0).astype(np.int32)
+        points[:, 0] = np.clip(points[:, 0], a_min=0, a_max=mask_w-1)
+        points[:, 1] = np.clip(points[:, 1], a_min=0, a_max=mask_h-1)
         mask[points[:, 1], points[:, 0]] = 1.0
         # gaussian filter
-        gauss_kernel = (11, 11) # must be odd
+        gauss_kernel = (5, 5) # must be odd
         mask_blur = cv2.GaussianBlur(mask, gauss_kernel, 1.3)
         return 255 * mask_blur / mask_blur.max()
 
@@ -209,15 +215,15 @@ if __name__ == "__main__":
     xml_file = "/home/zhognli/YOLOX/datasets/sample2/annotations.xml"
     img_dir  = "/home/zhognli/YOLOX/datasets/sample2/images"
     dataset = CVATVideoDataset(img_dir=img_dir, anno_path=xml_file)
-    # img, mask, bbox, points = dataset[14]
-    # print(img.shape)
-    # print(mask.shape)
-    # print(bbox.shape)
-    # print(points.shape)
-    # dataset.visual_data_sample()
+    img, mask, bbox, points = dataset[14]
+    print(img.shape)
+    print(mask.shape)
+    print(bbox.shape)
+    print(points.shape)
+    dataset.visual_data_sample()
 
-    # dataset self checking
-    for idx in range(len(dataset)):
-        img, mask, bbox, points = dataset[idx]
-        print(idx)
-        print("{}_{}".format(img.shape, mask.shape))
+    # # dataset self checking
+    # for idx in range(len(dataset)):
+    #     img, mask, bbox, points = dataset[idx]
+    #     print(idx)
+    #     print("{}_{}".format(img.shape, mask.shape))

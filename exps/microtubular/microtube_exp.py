@@ -14,7 +14,7 @@ class Exp(MyExp):
         # ---------------- model config ---------------- #
         self.num_classes = 1
         self.depth = 1.00
-        self.width = 1.00
+        self.width = 0.50
         self.act = 'silu'
 
         # ---------------- dataloader config ---------------- #
@@ -24,7 +24,7 @@ class Exp(MyExp):
         # Actual multiscale ranges: [640-5*32, 640+5*32].
         # To disable multiscale training, set the
         # self.multiscale_range to 0.
-        self.multiscale_range = 5
+        self.multiscale_range = 0
         # You can uncomment this line to specify a multiscale range
         # self.random_size = (14, 26)
         self.train_img_dir = "/home/zhognli/YOLOX/datasets/sample2/images"
@@ -58,7 +58,7 @@ class Exp(MyExp):
         self.weight_decay = 5e-4
         self.momentum = 0.9
         self.print_interval = 10
-        self.eval_interval = 10
+        self.eval_interval = 1
         self.exp_name = os.path.split(os.path.realpath(__file__))[1].split(".")[0]
 
         # -----------------  testing config ------------------ #

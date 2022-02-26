@@ -3,11 +3,13 @@
 # Copyright (c) Megvii, Inc. and its affiliates.
 
 import argparse
+from email.policy import default
 import os
 import time
 from loguru import logger
 
 import cv2
+import matplotlib.pyplot as plt
 
 import torch
 
@@ -22,17 +24,18 @@ IMAGE_EXT = [".jpg", ".jpeg", ".webp", ".bmp", ".png"]
 def make_parser():
     parser = argparse.ArgumentParser("YOLOX Demo!")
     parser.add_argument(
-        "demo", default="image", help="demo type, eg. image, video and webcam"
+        "--demo", default="image", help="demo type, eg. image, video and webcam"
     )
-    parser.add_argument("-expn", "--experiment-name", type=str, default=None)
-    parser.add_argument("-n", "--name", type=str, default=None, help="model name")
+    parser.add_argument("-expn", "--experiment-name", type=str, default="spindle detection")
+    parser.add_argument("-n", "--name", type=str, default="yolox_s", help="model name")
 
     parser.add_argument(
-        "--path", default="./assets/dog.jpg", help="path to images or video"
+        "--path", default="/home/zhognli/YOLOX/datasets/sample2/images/frame_000036.PNG", help="path to images or video"
     )
     parser.add_argument("--camid", type=int, default=0, help="webcam demo camera id")
     parser.add_argument(
         "--save_result",
+        default=True,
         action="store_true",
         help="whether to save the inference result of image/video",
     )
@@ -41,11 +44,11 @@ def make_parser():
     parser.add_argument(
         "-f",
         "--exp_file",
-        default=None,
+        default="/home/zhognli/YOLOX/exps/microtubular/microtube_exp.py",
         type=str,
         help="pls input your experiment description file",
     )
-    parser.add_argument("-c", "--ckpt", default=None, type=str, help="ckpt for eval")
+    parser.add_argument("-c", "--ckpt", default="/home/zhognli/YOLOX/YOLOX_outputs/spindle_detection/latest_ckpt.pth", type=str, help="ckpt for eval")
     parser.add_argument(
         "--device",
         default="cpu",
@@ -92,7 +95,7 @@ def get_image_list(path):
         for filename in file_name_list:
             apath = os.path.join(maindir, filename)
             ext = os.path.splitext(apath)[1]
-            if ext in IMAGE_EXT:
+            if ext.lower() in IMAGE_EXT:
                 image_names.append(apath)
     return image_names
 
@@ -155,15 +158,16 @@ class Predictor(object):
 
         with torch.no_grad():
             t0 = time.time()
-            outputs = self.model(img)
+            outputs, mask = self.model(img)
             if self.decoder is not None:
                 outputs = self.decoder(outputs, dtype=outputs.type())
             outputs = postprocess(
                 outputs, self.num_classes, self.confthre,
                 self.nmsthre, class_agnostic=True
             )
+            mask = mask.squeeze().numpy()
             logger.info("Infer time: {:.4f}s".format(time.time() - t0))
-        return outputs, img_info
+        return outputs, mask, img_info
 
     def visual(self, output, img_info, cls_conf=0.35):
         ratio = img_info["ratio"]
@@ -191,7 +195,7 @@ def image_demo(predictor, vis_folder, path, current_time, save_result):
         files = [path]
     files.sort()
     for image_name in files:
-        outputs, img_info = predictor.inference(image_name)
+        outputs, mask, img_info = predictor.inference(image_name)
         result_image = predictor.visual(outputs[0], img_info, predictor.confthre)
         if save_result:
             save_folder = os.path.join(
@@ -201,6 +205,8 @@ def image_demo(predictor, vis_folder, path, current_time, save_result):
             save_file_name = os.path.join(save_folder, os.path.basename(image_name))
             logger.info("Saving detection result in {}".format(save_file_name))
             cv2.imwrite(save_file_name, result_image)
+            save_mask_name = os.path.join(save_folder, "mask_"+os.path.basename(image_name))
+            plt.imsave(save_mask_name, mask)
         ch = cv2.waitKey(0)
         if ch == 27 or ch == ord("q") or ch == ord("Q"):
             break
