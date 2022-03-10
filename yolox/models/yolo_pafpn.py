@@ -155,7 +155,7 @@ class YOLOPAFPN(nn.Module):
         mask_2 = self.C3_p1(mask_4)     # 128/2 -> 64/2
 
         # mask = self.upsample(mask_2)    # 32/2 -> 32/1
-        mask = self.C3_p0(mask_2)         # 64/1 -> 64/1
+        # mask = self.C3_p0(mask)         # 64/1 -> 64/1
 
         outputs = (pan_out2, pan_out1, pan_out0)
-        return outputs, mask
+        return outputs, mask_2

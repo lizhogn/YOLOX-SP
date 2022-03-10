@@ -44,7 +44,7 @@ def make_parser():
     parser.add_argument(
         "--resume", default=False, action="store_true", help="resume training"
     )
-    parser.add_argument("-c", "--ckpt", default=None, type=str, help="checkpoint file")
+    parser.add_argument("-c", "--ckpt", default="/home/zhognli/YOLOX/YOLOX_outputs/ckpt/yolox_640.pth", type=str, help="checkpoint file")
     parser.add_argument(
         "-e",
         "--start_epoch",

@@ -7,7 +7,7 @@ import torch.nn as nn
 
 from .yolo_head import YOLOXHead
 from .yolo_pafpn import YOLOPAFPN
-from .unet_head import UnetHead, HeatMapHead
+from .unet_head import HeatMapHead
 
 
 class YOLOX(nn.Module):
@@ -41,8 +41,8 @@ class YOLOX(nn.Module):
             )
             mask_loss = self.mask_head(mask_features, target_mask)
             # mask_loss = torch.tensor([0])
-            total_loss = mask_loss
-            # total_loss = det_loss + mask_loss
+            # total_loss = mask_loss
+            total_loss = det_loss + 10.0 * mask_loss
             # total_loss = det_loss
             loss_outputs = {
                 "total_loss": total_loss,

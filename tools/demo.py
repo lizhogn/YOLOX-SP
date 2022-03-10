@@ -30,7 +30,7 @@ def make_parser():
     parser.add_argument("-n", "--name", type=str, default="yolox_s", help="model name")
 
     parser.add_argument(
-        "--path", default="/home/zhognli/YOLOX/datasets/sample2/images/frame_000036.PNG", help="path to images or video"
+        "--path", default="/home/zhognli/YOLOX/datasets/test", help="path to images or video"
     )
     parser.add_argument("--camid", type=int, default=0, help="webcam demo camera id")
     parser.add_argument(
@@ -51,7 +51,7 @@ def make_parser():
     parser.add_argument("-c", "--ckpt", default="/home/zhognli/YOLOX/YOLOX_outputs/spindle_detection/latest_ckpt.pth", type=str, help="ckpt for eval")
     parser.add_argument(
         "--device",
-        default="cpu",
+        default="gpu",
         type=str,
         help="device to run our model, can either be cpu or gpu",
     )
@@ -165,7 +165,7 @@ class Predictor(object):
                 outputs, self.num_classes, self.confthre,
                 self.nmsthre, class_agnostic=True
             )
-            mask = mask.squeeze().numpy()
+            mask = mask.cpu().squeeze().numpy()
             logger.info("Infer time: {:.4f}s".format(time.time() - t0))
         return outputs, mask, img_info
 
@@ -194,8 +194,13 @@ def image_demo(predictor, vis_folder, path, current_time, save_result):
     else:
         files = [path]
     files.sort()
+    average_infer_time = 0
+    total_img = len(files)
+
     for image_name in files:
+        start_time = time.time()
         outputs, mask, img_info = predictor.inference(image_name)
+        average_infer_time += (time.time() - start_time) / total_img
         result_image = predictor.visual(outputs[0], img_info, predictor.confthre)
         if save_result:
             save_folder = os.path.join(
@@ -211,6 +216,7 @@ def image_demo(predictor, vis_folder, path, current_time, save_result):
         if ch == 27 or ch == ord("q") or ch == ord("Q"):
             break
 
+    logger.info("Average Infer time: {:.4f}s".format(average_infer_time))
 
 def imageflow_demo(predictor, vis_folder, current_time, args):
     cap = cv2.VideoCapture(args.path if args.demo == "video" else args.camid)

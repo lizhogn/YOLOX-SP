@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 from yolox.evaluators.voc_eval import voc_eval
 
-from .datasets_wrapper import Dataset
+from datasets_wrapper import Dataset
 # from .voc_classes import VOC_CLASSES
 
 class CVATVideoDataset(Dataset):
@@ -159,7 +159,7 @@ class CVATVideoDataset(Dataset):
             # concat the image and mask together
             img, mask, bboxes = self.preproc(img, bboxes, self.input_dim, mask)
 
-        return img, mask, bboxes
+        return img, mask, bboxes, points
 
     def _mask_generate(self, bboxes, points, img_size, scale=1):
         mask_h = int(img_size[0] / scale)
@@ -201,7 +201,7 @@ class CVATVideoDataset(Dataset):
         r = img_size / max(h0, w0)  # ratio
         if r != 1:  # if sizes are not equal
             im = cv2.resize(im, (int(w0 * r), int(h0 * r)),
-                            interpolation=cv2.INTER_LINEAR)
+                            interpolation=cv2.INTER_AREA if r < 1 and not self.augment else cv2.INTER_LINEAR)
         return im, (h0, w0), im.shape[:2]  # im, hw_original, hw_resized
 
     def _norm_bboxes(self, bboxes, old_size, new_size):

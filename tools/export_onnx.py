@@ -17,7 +17,7 @@ from yolox.utils import replace_module
 def make_parser():
     parser = argparse.ArgumentParser("YOLOX onnx deploy")
     parser.add_argument(
-        "--output-name", type=str, default="yolox.onnx", help="output name of models"
+        "--output-name", type=str, default="yolox_gpu.onnx", help="output name of models"
     )
     parser.add_argument(
         "--input", default="images", type=str, help="input node name of onnx model"
@@ -36,13 +36,13 @@ def make_parser():
     parser.add_argument(
         "-f",
         "--exp_file",
-        default=None,
+        default="/home/zhognli/YOLOX/exps/microtubular/microtube_exp.py",
         type=str,
         help="expriment description file",
     )
     parser.add_argument("-expn", "--experiment-name", type=str, default=None)
     parser.add_argument("-n", "--name", type=str, default=None, help="model name")
-    parser.add_argument("-c", "--ckpt", default=None, type=str, help="ckpt path")
+    parser.add_argument("-c", "--ckpt", default="/home/zhognli/YOLOX/YOLOX_outputs/spindle_detection/latest_ckpt.pth", type=str, help="ckpt path")
     parser.add_argument(
         "opts",
         help="Modify config options using the command-line",
@@ -71,14 +71,14 @@ def main():
         ckpt_file = args.ckpt
 
     # load the model state dict
-    ckpt = torch.load(ckpt_file, map_location="cpu")
+    ckpt = torch.load(ckpt_file, map_location="cuda")
 
     model.eval()
     if "model" in ckpt:
         ckpt = ckpt["model"]
     model.load_state_dict(ckpt)
     model = replace_module(model, nn.SiLU, SiLU)
-    model.head.decode_in_inference = False
+    model.det_head.decode_in_inference = False
 
     logger.info("loading checkpoint done.")
     dummy_input = torch.randn(args.batch_size, 3, exp.test_size[0], exp.test_size[1])

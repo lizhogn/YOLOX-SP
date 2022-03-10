@@ -21,14 +21,14 @@ def make_parser():
         "-m",
         "--model",
         type=str,
-        default="yolox.onnx",
+        default="/home/zhognli/YOLOX/demo/ONNXRuntime/yolox.onnx",
         help="Input your onnx model.",
     )
     parser.add_argument(
         "-i",
         "--image_path",
         type=str,
-        default='test_image.png',
+        default='/home/zhognli/YOLOX/datasets/sample2/images/frame_000036.PNG',
         help="Path to your input image.",
     )
     parser.add_argument(
@@ -70,6 +70,8 @@ if __name__ == '__main__':
 
     ort_inputs = {session.get_inputs()[0].name: img[None, :, :, :]}
     output = session.run(None, ort_inputs)
+
+    # detection branch
     predictions = demo_postprocess(output[0], input_shape, p6=args.with_p6)[0]
 
     boxes = predictions[:, :4]
@@ -90,3 +92,8 @@ if __name__ == '__main__':
     mkdir(args.output_dir)
     output_path = os.path.join(args.output_dir, args.image_path.split("/")[-1])
     cv2.imwrite(output_path, origin_img)
+
+    # heatmap branch
+    heatmap = (output[1].squeeze()*255).astype(np.uint8)
+    heatmap_path = os.path.join(args.output_dir, "mask_" + args.image_path.split("/")[-1])
+    cv2.imwrite(heatmap_path, heatmap)

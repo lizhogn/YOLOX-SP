@@ -199,7 +199,7 @@ class Trainer:
 
         if self.epoch + 1 == self.max_epoch - self.exp.no_aug_epochs or self.no_aug:
             logger.info("--->No mosaic aug now!")
-            self.train_loader.close_mosaic()
+            # self.train_loader.close_mosaic()
             logger.info("--->Add additional L1 loss now!")
             if self.is_distributed:
                 self.model.module.head.use_l1 = True

@@ -8,4 +8,4 @@ from .yolo_fpn import YOLOFPN
 from .yolo_head import YOLOXHead
 from .yolo_pafpn import YOLOPAFPN
 from .yolox import YOLOX
-from .unet_head import UnetHead, HeatMapHead
+from .unet_head import HeatMapHead

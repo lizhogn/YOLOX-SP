@@ -156,14 +156,14 @@ def preproc(img, input_size, swap=(2, 0, 1)):
         (int(img.shape[1] * r), int(img.shape[0] * r)),
         interpolation=cv2.INTER_LINEAR,
     ).astype(np.uint8)
-    padded_img[: int(img.shape[0] * r), : int(img.shape[1] * r)] = resized_img
+    padded_img[: int(img.shape[0] * r), :int(img.shape[1] * r)] = resized_img
 
     padded_img = padded_img.transpose(swap)
     padded_img = np.ascontiguousarray(padded_img, dtype=np.float32)
     return padded_img, r
 
-def preproc_mask(img, input_size):
-    padded_img = np.zeros((input_size[0], input_size[1]), dtype=np.uint8)
+def preproc_mask(img, input_size, swap=(2, 0, 1)):
+    padded_img = np.zeros((input_size[0], input_size[1], 2), dtype=np.uint8)
     
     r = min(input_size[0] / img.shape[0], input_size[1] / img.shape[1])
     resized_img = cv2.resize(
@@ -172,7 +172,7 @@ def preproc_mask(img, input_size):
         interpolation=cv2.INTER_LINEAR,
     ).astype(np.uint8)
     padded_img[:int(img.shape[0]*r), :int(img.shape[1]*r)] = resized_img
-
+    padded_img = padded_img.transpose(swap)
     padded_img = np.ascontiguousarray(padded_img, dtype=np.float32)
     return padded_img, r
 
@@ -226,7 +226,6 @@ class TrainTransform:
             image_t, mask_t, boxes = _mirror(image, boxes, mask, self.flip_prob)
             image_t, r_ = preproc(image_t, input_dim)
             mask_t,  r_ = preproc_mask(mask_t, mask_input_dim)
-            mask_t = mask_t[np.newaxis, :, :]
             
         # boxes [xyxy] 2 [cx,cy,w,h]
         boxes = xyxy2cxcywh(boxes)
