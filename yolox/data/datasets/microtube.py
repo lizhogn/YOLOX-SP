@@ -173,7 +173,7 @@ class VOCDetSegDataset(Dataset):
 if __name__ == "__main__":
     xml_file = "/home/zhognli/YOLOX/datasets/sample2/annotations.xml"
     img_dir  = "/home/zhognli/YOLOX/datasets/sample2/images"
-    dataset = VOCDetSegDataset(img_dir=img_dir, anno_path=xml_file,)
+    dataset = VOCDetSegDataset(img_dir=img_dir, anno_path=xml_file)
     img, mask, bbox, points = dataset[0]
     print(img.shape)
     print(mask.shape)

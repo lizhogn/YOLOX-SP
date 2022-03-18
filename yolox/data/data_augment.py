@@ -177,10 +177,11 @@ def preproc_mask(img, input_size, swap=(2, 0, 1)):
     return padded_img, r
 
 class TrainTransform:
-    def __init__(self, max_labels=50, flip_prob=0.5, hsv_prob=1.0):
+    def __init__(self, max_labels=50, flip_prob=0.5, hsv_prob=1.0, del_green_prob=0):
         self.max_labels = max_labels
         self.flip_prob = flip_prob
         self.hsv_prob = hsv_prob
+        self.del_green_prob = del_green_prob
 
     def __call__(self, image, targets, input_dim, mask=None):
         """
@@ -214,6 +215,8 @@ class TrainTransform:
 
         if random.random() < self.hsv_prob:
             augment_hsv(image)
+        if random.random() < self.del_green_prob:
+            image[:, :, 1] *= random.random()
         if mask is None:
             image_t, boxes = _mirror(image, boxes, self.flip_prob)
             height, width, _ = image_t.shape

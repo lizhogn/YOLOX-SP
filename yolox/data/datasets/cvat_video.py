@@ -84,6 +84,10 @@ class CVATVideoDataset(Dataset):
                 frame_id = frame.attrib["frame"]
                 img_name = "frame_{:0>6d}.PNG".format(int(frame_id))
                 is_outside = True if frame.attrib["outside"] == "1" else False
+                
+                img_path = os.path.join(self.img_dir, img_name)
+                if not os.path.exists(img_path):
+                    continue
 
                 # save anno
                 if not is_outside:
@@ -140,7 +144,6 @@ class CVATVideoDataset(Dataset):
         cur_anno = self.annotations[idx]
         img_name = cur_anno["img_name"]
         img_path = os.path.join(self.img_dir, img_name)
-        img, hw_origin, hw_resize = self.load_image(img_path)
         
         # load the img
         img, hw_origin, hw_resize = self.load_image(img_path)
@@ -212,30 +215,35 @@ class CVATVideoDataset(Dataset):
     def visual_data_sample(self, idx=None, show_or_save="save"):
         if idx is None:
             idx = random.randint(0, len(self.annotations))
-        img, mask, bboxes, points = self.__getitem__(idx)
+        img, mask, bboxes = self.__getitem__(idx)
         # draw bboxes
         for bbox in bboxes:
             pt1, pt2 = (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3]))
             cv2.rectangle(img, pt1, pt2, color=[255, 0, 0], thickness=1, lineType=cv2.LINE_AA)
-        for point in points:
-            pt1, pt2 = (int(point[0]), int(point[1])), (int(point[2]), int(point[3]))
-            cv2.circle(img, pt1, radius=3, color=[0, 255, 0], thickness=1, lineType=cv2.LINE_AA)
-            cv2.circle(img, pt2, radius=3, color=[0, 255, 0], thickness=1, lineType=cv2.LINE_AA)
-        cv2.imwrite("visual_data_sample.png", img)
+        # for point in points:
+        #     pt1, pt2 = (int(point[0]), int(point[1])), (int(point[2]), int(point[3]))
+        #     cv2.circle(img, pt1, radius=3, color=[0, 255, 0], thickness=1, lineType=cv2.LINE_AA)
+        #     cv2.circle(img, pt2, radius=3, color=[0, 255, 0], thickness=1, lineType=cv2.LINE_AA)
+        # mixup img and mask
+        h, w, _ = img.shape
+        rmask = cv2.resize(mask[:, :, 0], dsize=(w, h), interpolation=cv2.INTER_LINEAR)
+        cmap = plt.get_cmap("gray")
+        rgba_img = cmap(rmask / 255)
+        rgb_img = np.delete(rgba_img, 3, 2) * 255
 
-        plt.imsave("mask.png", mask[:, :, 0])
-        plt.imsave("mask_pos.png", mask[:, :, 1])
-        
-        
+        mixup_img = (img[:, :, :] * 0.5 + rgb_img[:, :, ::-1] * 0.5).astype(np.uint8)
+
+        cv2.imwrite("visual_data_sample.png", mixup_img)
+        cv2.imwrite("mask.png", mask[:, :, 0])
+            
 if __name__ == "__main__":
-    xml_file = "/home/zhognli/YOLOX/datasets/sample2/annotations.xml"
-    img_dir  = "/home/zhognli/YOLOX/datasets/sample2/images"
+    xml_file = "datasets/total/total/annotations.xml"
+    img_dir  = "datasets/total/total/images/new_image"
     dataset = CVATVideoDataset(img_dir=img_dir, anno_path=xml_file)
-    img, mask, bbox, points = dataset[14]
+    img, mask, bbox = dataset[14]
     print(img.shape)
     print(mask.shape)
     print(bbox.shape)
-    print(points.shape)
     dataset.visual_data_sample()
 
     # # dataset self checking

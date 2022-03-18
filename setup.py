@@ -47,7 +47,7 @@ with open("yolox/__init__.py", "r") as f:
     ).group(1)
 
 
-with open("README.md", "r", encoding="utf-8") as f:
+with open("README_yolox.md", "r", encoding="utf-8") as f:
     long_description = f.read()
 
 

@@ -13,29 +13,30 @@ class Exp(MyExp):
 
         # ---------------- model config ---------------- #
         self.num_classes = 1
-        self.depth = 1.00
+        self.depth = 0.33
         self.width = 0.50
         self.act = 'silu'
 
         # ---------------- dataloader config ---------------- #
         # set worker to 4 for shorter dataloader init time
         self.data_num_workers = 4
-        self.input_size = (800, 800)  # (height, width)
+        self.input_size = (640, 640)  # (height, width)
         # Actual multiscale ranges: [640-5*32, 640+5*32].
         # To disable multiscale training, set the
         # self.multiscale_range to 0.
         self.multiscale_range = 0
         # You can uncomment this line to specify a multiscale range
         # self.random_size = (14, 26)
-        self.train_img_dir = "/home/zhognli/YOLOX/datasets/sample2/images"
-        self.train_anno_path = "/home/zhognli/YOLOX/datasets/sample2/annotations.xml"
+        self.train_img_dir = "/home/zhognli/YOLOX/datasets/total/total/images/new_image"
+        self.train_anno_path = "/home/zhognli/YOLOX/datasets/total/total/annotations.xml"
         self.val_img_dir = "/home/zhognli/YOLOX/datasets/sample2/images"
         self.val_anno_path = "/home/zhognli/YOLOX/datasets/sample2/annotations.xml"
 
         # --------------- transform config ----------------- #
-        self.mosaic_prob = 1.0
-        self.mixup_prob = 1.0
-        self.hsv_prob = 1.0
+        self.mosaic_prob = 0
+        self.mixup_prob = 0
+        self.hsv_prob = 0
+        self.del_green_prob = 0.5
         self.flip_prob = 0.5
         self.degrees = 10.0
         self.translate = 0.1
@@ -62,6 +63,6 @@ class Exp(MyExp):
         self.exp_name = os.path.split(os.path.realpath(__file__))[1].split(".")[0]
 
         # -----------------  testing config ------------------ #
-        self.test_size = (800, 800)
-        self.test_conf = 0.01
+        self.test_size = (640, 640)
+        self.test_conf = 0.2
         self.nmsthre = 0.65
