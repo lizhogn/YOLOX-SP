@@ -119,7 +119,7 @@ class Exp(BaseExp):
         local_rank = get_local_rank()
 
         with wait_for_the_master(local_rank):
-            dataset = CVATVideoDataset(img_dir=self.train_img_dir, 
+            self.dataset = CVATVideoDataset(img_dir=self.train_img_dir, 
                                     anno_path=self.train_anno_path,
                                     img_size=self.input_size,
                                     preproc=TrainTransform(
@@ -127,26 +127,6 @@ class Exp(BaseExp):
                                         flip_prob=self.flip_prob,
                                         hsv_prob=self.hsv_prob)
                                     )
-
-        # dataset = MosaicDetection(
-        #     dataset,
-        #     mosaic=not no_aug,
-        #     img_size=self.input_size,
-        #     preproc=TrainTransform(
-        #         max_labels=50,
-        #         flip_prob=self.flip_prob,
-        #         hsv_prob=self.hsv_prob),
-        #     degrees=self.degrees,
-        #     translate=self.translate,
-        #     mosaic_scale=self.mosaic_scale,
-        #     mixup_scale=self.mixup_scale,
-        #     shear=self.shear,
-        #     enable_mixup=self.enable_mixup,
-        #     mosaic_prob=self.mosaic_prob,
-        #     mixup_prob=self.mixup_prob,
-        # )
-
-        self.dataset = dataset
 
         if is_distributed:
             batch_size = batch_size // dist.get_world_size()

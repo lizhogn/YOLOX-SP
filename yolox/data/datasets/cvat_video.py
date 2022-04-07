@@ -7,12 +7,13 @@ from loguru import logger
 import cv2
 import numpy as np
 import random
+import math
 from yolox.data.datasets.datasets_wrapper import Dataset
 import matplotlib.pyplot as plt
 
 from yolox.evaluators.voc_eval import voc_eval
 
-from .datasets_wrapper import Dataset
+from datasets_wrapper import Dataset
 # from .voc_classes import VOC_CLASSES
 
 class CVATVideoDataset(Dataset):
@@ -38,13 +39,16 @@ class CVATVideoDataset(Dataset):
         anno_path,
         img_size=(640, 640),
         preproc=None,
+        mosaic=True
         # target_transform=AnnotationTransform()
     ):
         super().__init__(img_size)
         self.img_dir = img_dir
         self.anno_path = anno_path
         self.img_size = img_size    # (img_h, img_w)
+        self.mask_scale = 4
         self.preproc = preproc
+        self.mosaic = mosaic
         
         # load the annotation data
         self.annotations = self._load_annotations()
@@ -123,6 +127,26 @@ class CVATVideoDataset(Dataset):
     def __len__(self):
         return len(self.annotations)
 
+    def pull_item(self, idx):
+        cur_anno = self.annotations[idx]
+        img_name = cur_anno["img_name"]
+        img_path = os.path.join(self.img_dir, img_name)
+        
+        # load the img
+        img, hw_origin, hw_resize = self.load_image(img_path)
+        
+        # load bboxes
+        bboxes = np.asarray(cur_anno["bboxes"], dtype=np.float32)
+        bboxes = self._norm_bboxes(bboxes, old_size=hw_origin, new_size=hw_resize)
+        bboxes = np.concatenate([bboxes, np.zeros(shape=(len(bboxes), 1), dtype=np.float32)], axis=1)
+
+        # load points
+        points = np.asarray(cur_anno["points"], dtype=np.float32)
+        points = self._norm_bboxes(points, old_size=hw_origin, new_size=hw_resize)
+        mask = self._mask_generate(bboxes, points, hw_resize, scale=self.mask_scale)
+
+        return img, bboxes, mask
+        
     def __getitem__(self, idx):
         '''
         Returns: (before preproc)
@@ -141,28 +165,209 @@ class CVATVideoDataset(Dataset):
                 each point consists of [x1, y1, x2, y2], (at new size image scale)
         '''
 
-        cur_anno = self.annotations[idx]
-        img_name = cur_anno["img_name"]
-        img_path = os.path.join(self.img_dir, img_name)
-        
-        # load the img
-        img, hw_origin, hw_resize = self.load_image(img_path)
-        
-        # load bboxes
-        bboxes = np.asarray(cur_anno["bboxes"], dtype=np.float32)
-        bboxes = self._norm_bboxes(bboxes, old_size=hw_origin, new_size=hw_resize)
-        bboxes = np.concatenate([bboxes, np.zeros(shape=(len(bboxes), 1), dtype=np.float32)], axis=1)
-
-        # load points
-        points = np.asarray(cur_anno["points"], dtype=np.float32)
-        points = self._norm_bboxes(points, old_size=hw_origin, new_size=hw_resize)
-        mask = self._mask_generate(bboxes, points, hw_resize, scale=4)
+        # pull item
+        if self.mosaic:
+            img, bboxes, mask = self.mosaic_generate(idx)
+        else:
+            img, bboxes, mask = self.pull_item(idx)
 
         if self.preproc is not None:
             # concat the image and mask together
             img, mask, bboxes = self.preproc(img, bboxes, self.input_dim, mask)
 
         return img, mask, bboxes
+    
+    def mosaic_generate(self, idx):
+        mosaic_labels = []
+        input_h, input_w = self.input_dim
+
+        # mosaic center x, y
+        yc = int(random.uniform(0.5 * input_h, 1.5 * input_h))
+        xc = int(random.uniform(0.5 * input_w, 1.5 * input_w))
+
+        # 3 additional image indices
+        indices = [idx] + [random.randint(0, len(self.annotations) - 1) for _ in range(3)]
+
+        for i_mosaic, index in enumerate(indices):
+            img, bboxes, mask = self.pull_item(index)
+
+            # generate output mosaic image
+            (h, w, c) = img.shape[:3]
+            if i_mosaic == 0:
+                mosaic_img = np.full((input_h * 2, input_w * 2, c), 0, dtype=np.uint8)
+                mosaic_mask = np.full((input_h * 2 // self.mask_scale, input_w * 2 // self.mask_scale, 2), 0, dtype=np.uint8)
+
+            (l_x1, l_y1, l_x2, l_y2), (s_x1, s_y1, s_x2, s_y2) = self.get_mosaic_coordinate(
+                    mosaic_img, i_mosaic, xc, yc, w, h, input_h, input_w
+                )
+            (lm_x1, lm_y1, lm_x2, lm_y2) = [x // self.mask_scale for x in (l_x1, l_y1, l_x2, l_y2)]
+            (sm_x1, sm_y1, sm_x2, sm_y2) = [x // self.mask_scale for x in (s_x1, s_y1, s_x2, s_y2)]
+            lm_x2, lm_y2 = lm_x1 + (sm_x2 - sm_x1), lm_y1 + (sm_y2 - sm_y1)
+
+            mosaic_img[l_y1:l_y2, l_x1:l_x2] = img[s_y1:s_y2, s_x1:s_x2]
+            mosaic_mask[lm_y1:lm_y2, lm_x1:lm_x2] = mask[sm_y1:sm_y2, sm_x1:sm_x2]
+
+            padw, padh = l_x1 - s_x1, l_y1 - s_y1
+            labels = bboxes.copy()
+            if labels.size > 0:
+                labels[:, 0] = labels[:, 0] + padw
+                labels[:, 1] = labels[:, 1] + padh
+                labels[:, 2] = labels[:, 2] + padw
+                labels[:, 3] = labels[:, 3] + padh
+            
+            mosaic_labels.append(labels)
+        
+        if len(mosaic_labels):
+            mosaic_labels = np.concatenate(mosaic_labels, 0)
+            np.clip(mosaic_labels[:, 0], 0, 2 * input_w, out=mosaic_labels[:, 0])
+            np.clip(mosaic_labels[:, 1], 0, 2 * input_h, out=mosaic_labels[:, 1])
+            np.clip(mosaic_labels[:, 2], 0, 2 * input_w, out=mosaic_labels[:, 2])
+            np.clip(mosaic_labels[:, 3], 0, 2 * input_h, out=mosaic_labels[:, 3])
+
+        mosaic_img, mosaic_mask, mosaic_labels = self.random_affine(
+            mosaic_img,
+            mosaic_mask,
+            mosaic_labels,
+            target_size=(input_w, input_h),
+            mask_scale=self.mask_scale,
+            degrees=10.0,
+            translate=0.1,
+            scales=(0.5, 1.5),
+            shear=2.0,
+        )
+        
+        # filter out small box
+        labels_w = mosaic_labels[:, 2] - mosaic_labels[:, 0]
+        labels_h = mosaic_labels[:, 3] - mosaic_labels[:, 1]
+        mosaic_labels = mosaic_labels[np.logical_and(labels_w > 3, labels_h > 3)]
+        return mosaic_img, mosaic_labels, mosaic_mask
+
+    def random_affine(
+        self, 
+        img,
+        mask,
+        targets=(),
+        target_size=(640, 640),
+        mask_scale=4,
+        degrees=10,
+        translate=0.1,
+        scales=0.1,
+        shear=10,
+    ):
+    
+        mask_size = (target_size[0] // mask_scale, target_size[1] // mask_scale)
+        M, M_mask, scale = self.get_affine_matrix(target_size, mask_size, degrees, translate, scales, shear)
+
+        img = cv2.warpAffine(img, M, dsize=target_size, borderValue=(0, 0, 0))
+        mask = cv2.warpAffine(mask, M_mask, dsize=mask_size, borderValue=(0, 0))
+
+        # Transform label coordinates
+        if len(targets) > 0:
+            targets = self.apply_affine_to_bboxes(targets, target_size, M, scale)
+
+        return img, mask, targets
+
+    def get_affine_matrix(self, target_size, mask_size, degrees=10, translate=0.1, scales=0.1, shear=10):
+
+        # random value
+        def get_aug_params(value, center=0):
+            if isinstance(value, float):
+                return random.uniform(center - value, center + value)
+            elif len(value) == 2:
+                return random.uniform(value[0], value[1])
+            else:
+                raise ValueError(
+                    "Affine params should be either a sequence containing two values\
+                    or single float values. Got {}".format(value)
+                )
+
+        twidth, theight = target_size
+        mwidth, mheight = mask_size
+
+        # Rotation and Scale
+        angle = get_aug_params(degrees)
+        scale = get_aug_params(scales, center=1.0)
+
+        if scale <= 0.0:
+            raise ValueError("Argument scale should be positive")
+
+        R = cv2.getRotationMatrix2D(angle=angle, center=(0, 0), scale=scale)
+
+        M = np.ones([2, 3])
+        # Shear
+        shear_x = math.tan(get_aug_params(shear) * math.pi / 180)
+        shear_y = math.tan(get_aug_params(shear) * math.pi / 180)
+
+        M[0] = R[0] + shear_y * R[1]
+        M[1] = R[1] + shear_x * R[0]
+
+        # Translation
+        translation_x = get_aug_params(translate)   # x translation (pixels)
+        translation_y = get_aug_params(translate)   # y translation (pixels)
+
+        target_tx = translation_x * twidth
+        target_ty = translation_y * theight
+        mask_tx = translation_x * mwidth
+        mask_ty = translation_y * mheight
+
+        M[0, 2] = target_tx
+        M[1, 2] = target_ty
+
+        M_mask = M.copy()
+        M_mask[0, 2] = mask_tx
+        M_mask[1, 2] = mask_ty
+
+        return M, M_mask, scale
+
+    def apply_affine_to_bboxes(self, targets, target_size, M, scale):
+        num_gts = len(targets)
+
+        # warp corner points
+        twidth, theight = target_size
+        corner_points = np.ones((4 * num_gts, 3))
+        corner_points[:, :2] = targets[:, [0, 1, 2, 3, 0, 3, 2, 1]].reshape(
+            4 * num_gts, 2
+        )  # x1y1, x2y2, x1y2, x2y1
+        corner_points = corner_points @ M.T  # apply affine transform
+        corner_points = corner_points.reshape(num_gts, 8)
+
+        # create new boxes
+        corner_xs = corner_points[:, 0::2]
+        corner_ys = corner_points[:, 1::2]
+        new_bboxes = (
+            np.concatenate(
+                (corner_xs.min(1), corner_ys.min(1), corner_xs.max(1), corner_ys.max(1))
+            )
+            .reshape(4, num_gts)
+            .T
+        )
+
+        # clip boxes
+        new_bboxes[:, 0::2] = new_bboxes[:, 0::2].clip(0, twidth)
+        new_bboxes[:, 1::2] = new_bboxes[:, 1::2].clip(0, theight)
+
+        targets[:, :4] = new_bboxes
+
+        return targets
+            
+    def get_mosaic_coordinate(self, mosaic_image, mosaic_index, xc, yc, w, h, input_h, input_w):
+        # index0 to top left part of image
+        if mosaic_index == 0:
+            x1, y1, x2, y2 = max(xc - w, 0), max(yc - h, 0), xc, yc
+            small_coord = w - (x2 - x1), h - (y2 - y1), w, h
+        # index1 to top right part of image
+        elif mosaic_index == 1:
+            x1, y1, x2, y2 = xc, max(yc - h, 0), min(xc + w, input_w * 2), yc
+            small_coord = 0, h - (y2 - y1), min(w, x2 - x1), h
+        # index2 to bottom left part of image
+        elif mosaic_index == 2:
+            x1, y1, x2, y2 = max(xc - w, 0), yc, xc, min(input_h * 2, yc + h)
+            small_coord = w - (x2 - x1), 0, w, min(y2 - y1, h)
+        # index2 to bottom right part of image
+        elif mosaic_index == 3:
+            x1, y1, x2, y2 = xc, yc, min(xc + w, input_w * 2), min(input_h * 2, yc + h)  # noqa
+            small_coord = 0, 0, min(w, x2 - x1), min(y2 - y1, h)
+        return (x1, y1, x2, y2), small_coord
 
     def _mask_generate(self, bboxes, points, img_size, scale=1):
         mask_h = int(img_size[0] / scale)
@@ -216,10 +421,15 @@ class CVATVideoDataset(Dataset):
         if idx is None:
             idx = random.randint(0, len(self.annotations))
         img, mask, bboxes = self.__getitem__(idx)
+
+        print(img.shape)
+        print(mask.shape)
+        print(bboxes.shape)
+        print(bboxes)
         # draw bboxes
         for bbox in bboxes:
             pt1, pt2 = (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3]))
-            cv2.rectangle(img, pt1, pt2, color=[255, 0, 0], thickness=1, lineType=cv2.LINE_AA)
+            cv2.rectangle(img, pt1, pt2, color=[0, 255, 0], thickness=1, lineType=cv2.LINE_AA)
         # for point in points:
         #     pt1, pt2 = (int(point[0]), int(point[1])), (int(point[2]), int(point[3]))
         #     cv2.circle(img, pt1, radius=3, color=[0, 255, 0], thickness=1, lineType=cv2.LINE_AA)
@@ -237,14 +447,11 @@ class CVATVideoDataset(Dataset):
         cv2.imwrite("mask.png", mask[:, :, 0])
             
 if __name__ == "__main__":
-    xml_file = "datasets/total/total/annotations.xml"
-    img_dir  = "datasets/total/total/images/new_image"
+    xml_file = "/home/zhognli/YOLOX/datasets/spindle/train_set/annotations.xml"
+    img_dir  = "/home/zhognli/YOLOX/datasets/spindle/train_set/images"
     dataset = CVATVideoDataset(img_dir=img_dir, anno_path=xml_file)
-    img, mask, bbox = dataset[14]
-    print(img.shape)
-    print(mask.shape)
-    print(bbox.shape)
-    dataset.visual_data_sample()
+    for idx in range(len(dataset)):
+        dataset.visual_data_sample(idx)
 
     # # dataset self checking
     # for idx in range(len(dataset)):
