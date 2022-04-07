@@ -199,7 +199,7 @@ class TrainTransform:
             targets = np.zeros((self.max_labels, 5), dtype=np.float32)
             image, r_o = preproc(image, input_dim)
             if mask is not None:
-                mask, r_o_m = preproc(mask, mask_input_dim)
+                mask, r_o_m = preproc_mask(mask, mask_input_dim)
                 return image, mask, targets
             return image, targets
 
@@ -225,7 +225,6 @@ class TrainTransform:
             # img_mask = np.concatenate([image, mask], axis=2)
             # img_mask_t, boxes = _mirror(img_mask, boxes, self.flip_prob)
             # image_t, mask_t = img_mask_t[:, :, :3], img_mask_t[:, :, 3]
-
             image_t, mask_t, boxes = _mirror(image, boxes, mask, self.flip_prob)
             image_t, r_ = preproc(image_t, input_dim)
             mask_t,  r_ = preproc_mask(mask_t, mask_input_dim)

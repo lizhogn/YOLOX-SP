@@ -43,7 +43,7 @@ class Exp(MyExp):
         self.mosaic_scale = (0.1, 2)
         self.mixup_scale = (0.5, 1.5)
         self.shear = 2.0
-        self.enable_mixup = True
+        self.enable_mixup = False
 
         # --------------  training config --------------------- #
         self.warmup_epochs = 5

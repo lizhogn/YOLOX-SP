@@ -108,7 +108,6 @@ class Exp(BaseExp):
         from yolox.data import (
             CVATVideoDataset,
             TrainTransform,
-            MosaicDetection,
             worker_init_reset_seed,
         )
         from yolox.utils import (
@@ -125,7 +124,8 @@ class Exp(BaseExp):
                                     preproc=TrainTransform(
                                         max_labels=50,
                                         flip_prob=self.flip_prob,
-                                        hsv_prob=self.hsv_prob)
+                                        hsv_prob=self.hsv_prob),
+                                    mosaic=not(no_aug)
                                     )
 
         if is_distributed:

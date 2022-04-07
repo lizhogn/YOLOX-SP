@@ -13,8 +13,7 @@ import matplotlib.pyplot as plt
 
 from yolox.evaluators.voc_eval import voc_eval
 
-from datasets_wrapper import Dataset
-# from .voc_classes import VOC_CLASSES
+from .datasets_wrapper import Dataset
 
 class CVATVideoDataset(Dataset):
     """
@@ -39,7 +38,7 @@ class CVATVideoDataset(Dataset):
         anno_path,
         img_size=(640, 640),
         preproc=None,
-        mosaic=True
+        mosaic=False
         # target_transform=AnnotationTransform()
     ):
         super().__init__(img_size)

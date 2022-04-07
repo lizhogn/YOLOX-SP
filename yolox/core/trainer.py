@@ -202,9 +202,9 @@ class Trainer:
             # self.train_loader.close_mosaic()
             logger.info("--->Add additional L1 loss now!")
             if self.is_distributed:
-                self.model.module.head.use_l1 = True
+                self.model.module.det_head.use_l1 = True
             else:
-                self.model.head.use_l1 = True
+                self.model.det_head.use_l1 = True
             self.exp.eval_interval = 1
             if not self.no_aug:
                 self.save_ckpt(ckpt_name="last_mosaic_epoch")
