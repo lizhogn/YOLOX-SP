@@ -195,6 +195,7 @@ class Trainer:
         )
 
     def before_epoch(self):
+        # self.evaluate_and_save_model()
         logger.info("---> start train epoch{}".format(self.epoch + 1))
 
         if self.epoch + 1 == self.max_epoch - self.exp.no_aug_epochs or self.no_aug:
@@ -212,13 +213,9 @@ class Trainer:
     def after_epoch(self):
         self.save_ckpt(ckpt_name="latest")
 
-        # if (self.epoch) % self.exp.eval_interval == 0:
-        #     all_reduce_norm(self.model)
-        #     self.evaluate_and_save_model()
-        # pass
-
-        # evaluate the model
-        self.evaluate_mask_model()
+        if (self.epoch) % self.exp.eval_interval == 0:
+            all_reduce_norm(self.model)
+            self.evaluate_and_save_model()
 
     def before_iter(self):
         pass
@@ -313,18 +310,14 @@ class Trainer:
             if is_parallel(evalmodel):
                 evalmodel = evalmodel.module
 
-        ap50_95, ap50, summary = self.exp.eval(
+        summary = self.exp.eval(
             evalmodel, self.evaluator, self.is_distributed
         )
+        
+        logger.info("Detection branch metric: Precision: {}, Recall: {}".format(
+                summary["detection"]["precision"], summary["detection"]["recall"]))
+        logger.info("Endpoints branch metric: Recall: {}".format(summary["endpoints"]))
         self.model.train()
-        if self.rank == 0:
-            self.tblogger.add_scalar("val/COCOAP50", ap50, self.epoch + 1)
-            self.tblogger.add_scalar("val/COCOAP50_95", ap50_95, self.epoch + 1)
-            logger.info("\n" + summary)
-        synchronize()
-
-        self.save_ckpt("last_epoch", ap50_95 > self.best_ap)
-        self.best_ap = max(self.best_ap, ap50_95)
 
     def save_ckpt(self, ckpt_name, update_best_ckpt=False):
         if self.rank == 0:

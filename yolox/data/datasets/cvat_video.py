@@ -38,7 +38,8 @@ class CVATVideoDataset(Dataset):
         anno_path,
         img_size=(640, 640),
         preproc=None,
-        mosaic=False
+        mosaic=False,
+        mode="train"    # "train" or "eval"
         # target_transform=AnnotationTransform()
     ):
         super().__init__(img_size)
@@ -48,6 +49,7 @@ class CVATVideoDataset(Dataset):
         self.mask_scale = 4
         self.preproc = preproc
         self.mosaic = mosaic
+        self.mode = mode
         
         # load the annotation data
         self.annotations = self._load_annotations()
@@ -144,7 +146,7 @@ class CVATVideoDataset(Dataset):
         points = self._norm_bboxes(points, old_size=hw_origin, new_size=hw_resize)
         mask = self._mask_generate(bboxes, points, hw_resize, scale=self.mask_scale)
 
-        return img, bboxes, mask
+        return img, bboxes, mask, points
         
     def __getitem__(self, idx):
         '''
@@ -168,13 +170,16 @@ class CVATVideoDataset(Dataset):
         if self.mosaic:
             img, bboxes, mask = self.mosaic_generate(idx)
         else:
-            img, bboxes, mask = self.pull_item(idx)
+            img, bboxes, mask, points = self.pull_item(idx)
 
         if self.preproc is not None:
             # concat the image and mask together
             img, mask, bboxes = self.preproc(img, bboxes, self.input_dim, mask)
 
-        return img, mask, bboxes
+        if self.mode == "train":
+            return img, mask, bboxes
+        else:
+            return img, bboxes, points
     
     def mosaic_generate(self, idx):
         mosaic_labels = []
@@ -188,7 +193,7 @@ class CVATVideoDataset(Dataset):
         indices = [idx] + [random.randint(0, len(self.annotations) - 1) for _ in range(3)]
 
         for i_mosaic, index in enumerate(indices):
-            img, bboxes, mask = self.pull_item(index)
+            img, bboxes, mask, _ = self.pull_item(index)
 
             # generate output mosaic image
             (h, w, c) = img.shape[:3]

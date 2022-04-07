@@ -125,8 +125,8 @@ class Exp(BaseExp):
                                         max_labels=50,
                                         flip_prob=self.flip_prob,
                                         hsv_prob=self.hsv_prob),
-                                    mosaic=not(no_aug)
-                                    )
+                                    mosaic=not(no_aug),
+                                    mode="train")
 
         if is_distributed:
             batch_size = batch_size // dist.get_world_size()
@@ -228,7 +228,8 @@ class Exp(BaseExp):
         valdataset = CVATVideoDataset(img_dir=self.val_img_dir, 
                                 anno_path=self.val_anno_path,
                                 img_size=self.input_size,
-                                preproc=ValTransform(legacy=legacy))
+                                preproc=ValTransform(legacy=legacy),
+                                mode="eval")
 
         if is_distributed:
             batch_size = batch_size // dist.get_world_size()
@@ -243,16 +244,16 @@ class Exp(BaseExp):
             "pin_memory": True,
             "sampler": sampler,
         }
-        dataloader_kwargs["batch_size"] = batch_size
+        dataloader_kwargs["batch_size"] = 1
         val_loader = torch.utils.data.DataLoader(valdataset, **dataloader_kwargs)
 
         return val_loader
 
     def get_evaluator(self, batch_size, is_distributed, testdev=False, legacy=False):
-        from yolox.evaluators import COCOEvaluator
+        from yolox.evaluators import CVATEvaluator
 
         val_loader = self.get_eval_loader(batch_size, is_distributed, testdev, legacy)
-        evaluator = COCOEvaluator(
+        evaluator = CVATEvaluator(
             dataloader=val_loader,
             img_size=self.test_size,
             confthre=self.test_conf,
