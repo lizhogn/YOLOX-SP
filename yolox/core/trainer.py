@@ -345,7 +345,7 @@ class Trainer:
     def evaluate_mask_model(self):
         import cv2
         import matplotlib.pyplot as plt
-        img_path = "/home/zhognli/YOLOX/datasets/sample2/images/frame_000036.PNG"
+        img_path = "/home/zhognli/YOLOX/datasets/spindle/test_set/images/frame_000034.PNG"
         img_raw = cv2.imread(img_path)
         # height, width = img.shape[:2]
         

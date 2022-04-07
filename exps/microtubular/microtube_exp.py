@@ -27,10 +27,10 @@ class Exp(MyExp):
         self.multiscale_range = 0
         # You can uncomment this line to specify a multiscale range
         # self.random_size = (14, 26)
-        self.train_img_dir = "/home/zhognli/YOLOX/datasets/total/total/images/new_image"
-        self.train_anno_path = "/home/zhognli/YOLOX/datasets/total/total/annotations.xml"
-        self.val_img_dir = "/home/zhognli/YOLOX/datasets/sample2/images"
-        self.val_anno_path = "/home/zhognli/YOLOX/datasets/sample2/annotations.xml"
+        self.train_img_dir = "/home/zhognli/YOLOX/datasets/spindle/train_set/images"
+        self.train_anno_path = "/home/zhognli/YOLOX/datasets/spindle/train_set/annotations.xml"
+        self.val_img_dir = "/home/zhognli/YOLOX/datasets/spindle/test_set/images"
+        self.val_anno_path = "/home/zhognli/YOLOX/datasets/spindle/test_set/annotations.xml"
 
         # --------------- transform config ----------------- #
         self.mosaic_prob = 0
