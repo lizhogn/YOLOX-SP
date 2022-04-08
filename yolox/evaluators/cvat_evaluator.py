@@ -3,7 +3,7 @@
 # Copyright (c) Megvii, Inc. and its affiliates.
 
 import contextlib
-import io
+import io, os
 import itertools
 import json
 import tempfile
@@ -110,7 +110,10 @@ class CVATEvaluator:
         points_recall = 0
         points_gt = 0
 
-        for cur_iter, (imgs, bboxes, points) in enumerate(
+        # badcase analysis
+        self.badcase_dict = {}
+
+        for cur_iter, (imgs, bboxes, points, img_info) in enumerate(
             progress_bar(self.dataloader)
         ):
             with torch.no_grad():
@@ -126,15 +129,29 @@ class CVATEvaluator:
                 masks = outputs[1].cpu().numpy().squeeze()
 
             # detections eval
-            correct, dt_cnt, gt_cnt = self.detection_eval(detections, bboxes, iou_thre=0.5)
+            correct, dt_cnt, gt_cnt, unmatched_gt, unmatched_dt = self.detection_eval(detections, bboxes, iou_thre=0.5)
             total_correct += correct
             total_dt += dt_cnt
             total_gt += gt_cnt
             
             # endpoints eval
-            pt_correct, pt_gt = self.mask_eval(masks, points)
+            pt_correct, pt_gt, unmatched_pt = self.mask_eval(masks, points)
             points_recall += pt_correct
             points_gt += pt_gt
+
+            # badcase
+            img_name = os.path.basename(img_info["img_name"][0])
+            self.badcase_dict[img_name] = {
+                "img_path": img_info["img_path"][0],
+                "detection": {
+                    "unmatched_gt": unmatched_gt,
+                    "unmatched_dt": unmatched_dt
+                },
+                "mask": {
+                    "unmatched_pt": unmatched_pt
+                },
+                "mag_rate": img_info["ratio"][0].item()
+            }
 
         # detections
         det_precision = round(total_correct / (total_dt + 1e-10), 3)
@@ -154,7 +171,7 @@ class CVATEvaluator:
 
     def detection_eval(self, dt, gt, iou_thre=0.5):
         if dt[0] is None:
-            return 0, 0, len(gt)
+            return 0, 0, len(gt), np.array([]), np.array([])
         else:
             dt = dt[0][:, 0:4].cpu().numpy()
             gt = gt[0][:, 0:4].numpy()
@@ -169,16 +186,28 @@ class CVATEvaluator:
         matched_indices = np.array(list(zip(x, y)))
         
         # filter out the matched with low IOU
+        matched_gt = []
+        matched_dt = []
         for m in matched_indices:
             if iou_matrix[m[0], m[1]] >= iou_thre:
                 correct += 1
+                matched_dt.append(m[0])
+                matched_gt.append(m[1])
         
-        return correct, total_dt, total_gt
+        # unmatched
+        unmatched_gt = [i for i in range(total_gt) if i not in matched_gt]
+        unmatched_dt = [j for j in range(total_dt) if j not in matched_dt]
+
+        # id to box
+        unmatched_gt = gt[unmatched_gt]
+        unmatched_dt = dt[unmatched_dt]
+                
+        return correct, total_dt, total_gt, unmatched_gt, unmatched_dt
 
     def mask_eval(self, mask, gt, radius=5, input_size=(640, 640)):
         gt = gt[0].numpy()
         if len(gt) == 0:
-            return 0, 0
+            return 0, 0, np.array([])
         gt = np.concatenate([gt[:, :2], gt[:, 2:]], axis=0)
 
         mask = cv2.resize(mask, input_size)
@@ -193,7 +222,54 @@ class CVATEvaluator:
         x, y = linear_sum_assignment(dis_mat)
         matched_indices = np.array(list(zip(x, y)))
         # filter out the matched indices
+        matched_gt = []
         for (x, y) in matched_indices:
             if dis_mat[x, y] <= radius:
                 correct += 1
-        return correct, total_gt
+                matched_gt.append(y)
+
+        unmatched_gt = [i for i in range(total_gt) if i not in matched_gt]
+        unmatched_gt = gt[unmatched_gt]
+
+        return correct, total_gt, unmatched_gt
+
+    def badcase_analysis(self, badcase_save_path):
+        
+        for imgname, badcase_info in self.badcase_dict.items():
+            # load img
+            img_path = badcase_info["img_path"]
+            img = cv2.imread(img_path)
+
+            ratio = badcase_info["mag_rate"]
+            unmatched_gt = badcase_info["detection"]["unmatched_gt"] / ratio
+            unmatched_dt = badcase_info["detection"]["unmatched_dt"] / ratio
+            unmatched_pt = badcase_info["mask"]["unmatched_pt"] / ratio
+
+            if len(unmatched_dt) == 0 and len(unmatched_gt) == 0 and len(unmatched_pt) == 0:
+                continue
+
+            # detection badcase
+            # draw not recall badcase
+            for gt in unmatched_gt:
+                x1, y1, x2, y2 = int(gt[0]), int(gt[1]), int(gt[2]), int(gt[3])
+                cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
+
+            # draw not precision badcase
+            for dt in unmatched_dt:
+                x1, y1, x2, y2 = int(dt[0]), int(dt[1]), int(dt[2]), int(dt[3])
+                cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+            # draw not recall points
+            for pt in unmatched_pt:
+                x, y = int(pt[0]), int(pt[1])
+                cv2.circle(img, (x, y), 5, (255, 0, 0), -1)
+            
+            # legend
+            cv2.putText(img, "not recall", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+            cv2.putText(img, "not precision", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+            cv2.putText(img, "not recall points", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+
+            # save img
+            save_name = os.path.join(badcase_save_path, imgname)
+            cv2.imwrite(save_name, img)
+            

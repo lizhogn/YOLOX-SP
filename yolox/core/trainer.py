@@ -215,7 +215,7 @@ class Trainer:
         self.save_ckpt(ckpt_name="latest")
 
         if (self.epoch) % self.exp.eval_interval == 0 and (self.epoch > self.exp.warmup_epochs):
-            all_reduce_norm(self.model)
+            # all_reduce_norm(self.model)
             self.evaluate_and_save_model()
 
     def before_iter(self):
@@ -241,6 +241,10 @@ class Trainer:
             loss_str = ", ".join(
                 ["{}: {:.3f}".format(k, v.latest) for k, v in loss_meter.items()]
             )
+            
+            weight_det = self.meter["weight_det"].latest
+            weight_mask = self.meter["weight_mask"].latest
+            rate_str = "det:mask rate: {:.2f}:{:.2f}".format(weight_det, weight_mask)
 
             time_meter = self.meter.get_filtered_meter("time")
             time_str = ", ".join(
@@ -248,11 +252,12 @@ class Trainer:
             )
 
             logger.info(
-                "{}, mem: {:.0f}Mb, {}, {}, lr: {:.3e}".format(
+                "{}, mem: {:.0f}Mb, {}, {}, {}, lr: {:.3e}".format(
                     progress_str,
                     gpu_mem_usage(),
                     time_str,
                     loss_str,
+                    rate_str,
                     self.meter["lr"].latest,
                 )
                 + (", size: {:d}, {}".format(self.input_size[0], eta_str))

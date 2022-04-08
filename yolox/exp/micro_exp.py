@@ -196,6 +196,9 @@ class Exp(BaseExp):
                     pg0.append(v.weight)  # no decay
                 elif hasattr(v, "weight") and isinstance(v.weight, nn.Parameter):
                     pg1.append(v.weight)  # apply decay
+            
+            pg_weight = []
+            pg_weight.append(self.model.state_dict()["params"])
 
             optimizer = torch.optim.SGD(
                 pg0, lr=lr, momentum=self.momentum, nesterov=True
@@ -204,6 +207,7 @@ class Exp(BaseExp):
                 {"params": pg1, "weight_decay": self.weight_decay}
             )  # add pg1 with weight_decay
             optimizer.add_param_group({"params": pg2})
+            optimizer.add_param_group({"params": pg_weight, "lr": 0.1})
             self.optimizer = optimizer
 
         return self.optimizer

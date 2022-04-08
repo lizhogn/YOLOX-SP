@@ -135,7 +135,7 @@ class CVATVideoDataset(Dataset):
         img_path = os.path.join(self.img_dir, img_name)
         
         # load the img
-        img, hw_origin, hw_resize = self.load_image(img_path)
+        img, hw_origin, hw_resize, r = self.load_image(img_path)
         
         # load bboxes
         bboxes = np.asarray(cur_anno["bboxes"], dtype=np.float32)
@@ -147,7 +147,15 @@ class CVATVideoDataset(Dataset):
         points = self._norm_bboxes(points, old_size=hw_origin, new_size=hw_resize)
         mask = self._mask_generate(bboxes, points, hw_resize, scale=self.mask_scale)
 
-        return img, bboxes, mask, points
+        img_info = {
+            "img_name": img_name,
+            "img_path": img_path,
+            "hw_origin": hw_origin,
+            "hw_resize": hw_resize,
+            "ratio": r
+        }
+
+        return img, bboxes, mask, points, img_info
         
     def __getitem__(self, idx):
         '''
@@ -166,12 +174,11 @@ class CVATVideoDataset(Dataset):
                 The shape is : [max_points, 4]
                 each point consists of [x1, y1, x2, y2], (at new size image scale)
         '''
-
         # pull item
         if self.mosaic:
-            img, bboxes, mask = self.mosaic_generate(idx)
+            img, bboxes, mask, img_info = self.mosaic_generate(idx)
         else:
-            img, bboxes, mask, points = self.pull_item(idx)
+            img, bboxes, mask, points, img_info = self.pull_item(idx)
 
         if self.preproc is not None:
             # concat the image and mask together
@@ -180,7 +187,7 @@ class CVATVideoDataset(Dataset):
         if self.mode == "train":
             return img, mask, bboxes
         else:
-            return img, bboxes, points
+            return img, bboxes, points, img_info
     
     def mosaic_generate(self, idx):
         mosaic_labels = []
@@ -194,7 +201,7 @@ class CVATVideoDataset(Dataset):
         indices = [idx] + [random.randint(0, len(self.annotations) - 1) for _ in range(3)]
 
         for i_mosaic, index in enumerate(indices):
-            img, bboxes, mask, _ = self.pull_item(index)
+            img, bboxes, mask, _, img_info = self.pull_item(index)
 
             # generate output mosaic image
             (h, w, c) = img.shape[:3]
@@ -240,12 +247,15 @@ class CVATVideoDataset(Dataset):
             scales=(0.5, 1.5),
             shear=2.0,
         )
+        # mosaic_img = mosaic_img[320:960, 320:960, :]
+        # mosaic_mask = mosaic_mask[80:240, 80:240, :]
+        # mosaic_labels -= 320
         
         # filter out small box
         labels_w = mosaic_labels[:, 2] - mosaic_labels[:, 0]
         labels_h = mosaic_labels[:, 3] - mosaic_labels[:, 1]
         mosaic_labels = mosaic_labels[np.logical_and(labels_w > 3, labels_h > 3)]
-        return mosaic_img, mosaic_labels, mosaic_mask
+        return mosaic_img, mosaic_labels, mosaic_mask, img_info
 
     def random_affine(
         self, 
@@ -255,8 +265,8 @@ class CVATVideoDataset(Dataset):
         target_size=(640, 640),
         mask_scale=4,
         degrees=10,
-        translate=0.1,
-        scales=0.1,
+        translate=1,
+        scales=1,
         shear=1,
     ):
     
@@ -395,13 +405,20 @@ class CVATVideoDataset(Dataset):
         mask_pos = np.zeros(shape=mask_size, dtype=np.float32)
         bboxes = (bboxes / scale).astype(np.int32)
         for box in bboxes:
-            pad_ = 5
+            pad_ = random.randint(5, 15)
             x1, y1, x2, y2, _ = box
             x_min = max(0, x1 - pad_)
             y_min = max(0, y1 - pad_)
             x_max = min(mask_w, x2 + pad_)
             y_max = min(mask_h, y2 + pad_)
             mask_pos[y_min:y_max, x_min:x_max] = 1.0
+
+        for _ in range(10):
+            x, y = random.randint(0, mask_w), random.randint(0, mask_h)
+            h = random.randint(5, 10)
+            w = random.randint(5, 10)
+            
+            mask_pos[y-h:y+h, x-w:x+w] = 1.0
 
         mask = np.stack([mask_blur, mask_pos], axis=2)
         return mask
@@ -415,7 +432,7 @@ class CVATVideoDataset(Dataset):
         if r != 1:  # if sizes are not equal
             im = cv2.resize(im, (int(w0 * r), int(h0 * r)),
                             interpolation=cv2.INTER_LINEAR)
-        return im, (h0, w0), im.shape[:2]  # im, hw_original, hw_resized
+        return im, (h0, w0), im.shape[:2], r  # im, hw_original, hw_resized
 
     def _norm_bboxes(self, bboxes, old_size, new_size):
         bboxes[::2] *= new_size[1] / old_size[1]
@@ -470,7 +487,7 @@ if __name__ == "__main__":
                            flip_prob=0.5,
                            hsv_prob=0
                        ),
-                       mosaic=False,
+                       mosaic=True,
                        mode="train")
     # for idx in range(len(dataset)):
     #     dataset.visual_data_sample(idx)

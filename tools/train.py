@@ -46,7 +46,7 @@ def make_parser():
     )
     parser.add_argument(
         "-c", "--ckpt", 
-        default=None, 
+        default="/home/zhognli/YOLOX/YOLOX_outputs/debug/latest_ckpt.pth", 
         type=str, 
         help="checkpoint file"
     )
@@ -92,7 +92,6 @@ def make_parser():
         nargs=argparse.REMAINDER,
     )
     return parser
-
 
 @logger.catch
 def main(exp, args):

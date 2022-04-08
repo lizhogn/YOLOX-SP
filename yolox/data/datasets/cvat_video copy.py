@@ -182,13 +182,20 @@ class CVATVideoDataset(Dataset):
         mask_pos = np.zeros(shape=mask_size, dtype=np.float32)
         bboxes = (bboxes / scale).astype(np.int32)
         for box in bboxes:
-            pad_ = 5
+            pad_ = random.randint(5, 15)
             x1, y1, x2, y2, _ = box
             x_min = max(0, x1 - pad_)
             y_min = max(0, y1 - pad_)
             x_max = min(mask_w, x2 + pad_)
             y_max = min(mask_h, y2 + pad_)
             mask_pos[y_min:y_max, x_min:x_max] = 1.0
+        
+        for _ in range(10):
+            x, y = random.randint(0, mask_w), random.randint(0, mask_h)
+            h = random.randint(5, 10)
+            w = random.randint(5, 10)
+            
+            mask_pos[y-h:y+h, x-w:x+w] = 1.0
 
         mask = np.stack([mask_blur, mask_pos], axis=2)
         return mask

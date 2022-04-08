@@ -31,7 +31,8 @@ class YOLOX(nn.Module):
         self.mask_head = mask_head
 
         # loss balancing
-        params = torch.ones(2, requires_grad=True)
+        # params = torch.ones(2, requires_grad=True)
+        params = torch.tensor([1.0, 0.33], requires_grad=True)
         self.params = torch.nn.Parameter(params)
 
     def forward(self, x, targets=None, target_mask=None):
@@ -46,11 +47,14 @@ class YOLOX(nn.Module):
             mask_loss = self.mask_head(mask_features, target_mask)
             # mask_loss = torch.tensor([0])
             # total_loss = mask_loss
-            total_loss = det_loss + 10.0 * mask_loss
+            # total_loss = det_loss + 10.0 * mask_loss
             # total_loss = torch.exp(-self.l_obj) * det_loss + torch.exp(-self.l_reg) * mask_loss + \
             #             (self.l_obj + self.l_reg)
-            # total_loss = 0.5 / (self.params[0] ** 2) * det_loss + torch.log(1 + self.params[0] ** 2) + \
-            #     0.5 / (self.params[1] ** 2) * mask_loss + torch.log(1 + self.params[1] ** 2)
+            total_loss = 0.5 / (self.params[0] ** 2) * det_loss + torch.log(1 + self.params[0] ** 2) + \
+                         0.5 / (self.params[1] ** 2) * mask_loss + torch.log(1 + self.params[1] ** 2)
+
+            w_det = (0.5 / (self.params[0] ** 2)).detach().cpu().numpy()
+            w_mask = (0.5 / (self.params[1] ** 2)).detach().cpu().numpy()
                 
             # total_loss = det_loss
             loss_outputs = {
@@ -61,8 +65,8 @@ class YOLOX(nn.Module):
                 "cls_loss": cls_loss,
                 "mask_loss": mask_loss,
                 "num_fg": num_fg,
-                # "obj_factor": self.l_obj,
-                # "reg_factor": self.l_reg
+                "weight_det": w_det, 
+                "weight_mask": w_mask,
             }
             return loss_outputs
         else:

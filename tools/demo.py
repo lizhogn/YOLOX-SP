@@ -3,7 +3,7 @@
 # Copyright (c) Megvii, Inc. and its affiliates.
 
 import argparse
-from email.policy import default
+from email.policy import default, strict
 import os
 import time
 from loguru import logger
@@ -30,7 +30,7 @@ def make_parser():
     parser.add_argument("-n", "--name", type=str, default="yolox_s", help="model name")
 
     parser.add_argument(
-        "--path", default="/home/zhognli/YOLOX/datasets/spindle/test_set/images", help="path to images or video"
+        "--path", default="/home/zhognli/YOLOX/datasets/spindle/test", help="path to images or video"
     )
     parser.add_argument("--camid", type=int, default=0, help="webcam demo camera id")
     parser.add_argument(
@@ -48,7 +48,7 @@ def make_parser():
         type=str,
         help="pls input your experiment description file",
     )
-    parser.add_argument("-c", "--ckpt", default="/home/zhognli/YOLOX/YOLOX_outputs/balance_weight/latest_ckpt.pth", type=str, help="ckpt for eval")
+    parser.add_argument("-c", "--ckpt", default="/home/zhognli/YOLOX/YOLOX_outputs/debug/latest_ckpt.pth", type=str, help="ckpt for eval")
     parser.add_argument(
         "--device",
         default="gpu",
@@ -290,7 +290,7 @@ def main(exp, args):
         logger.info("loading checkpoint")
         ckpt = torch.load(ckpt_file, map_location="cpu")
         # load the model state dict
-        model.load_state_dict(ckpt["model"])
+        model.load_state_dict(ckpt["model"], strict=False)
         logger.info("loaded checkpoint done.")
 
     if args.fuse:

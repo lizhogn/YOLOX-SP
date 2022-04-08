@@ -27,8 +27,8 @@ class Exp(MyExp):
         self.multiscale_range = 0
         # You can uncomment this line to specify a multiscale range
         # self.random_size = (14, 26)
-        self.train_img_dir = "/home/zhognli/YOLOX/datasets/spindle/test_set/images"
-        self.train_anno_path = "/home/zhognli/YOLOX/datasets/spindle/test_set/annotations.xml"
+        self.train_img_dir = "/home/zhognli/YOLOX/datasets/spindle/train_set/images"
+        self.train_anno_path = "/home/zhognli/YOLOX/datasets/spindle/train_set/annotations.xml"
         self.val_img_dir = "/home/zhognli/YOLOX/datasets/spindle/test_set/images"
         self.val_anno_path = "/home/zhognli/YOLOX/datasets/spindle/test_set/annotations.xml"
 
@@ -43,7 +43,7 @@ class Exp(MyExp):
         self.mosaic_scale = (0.7, 1.3)
         self.mixup_scale = (0.5, 1.5)
         self.shear = 2.0
-        self.enable_mosaic = False
+        self.enable_mosaic = True
         self.enable_mixup = False
 
         # --------------  training config --------------------- #
