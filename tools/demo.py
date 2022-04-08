@@ -48,7 +48,7 @@ def make_parser():
         type=str,
         help="pls input your experiment description file",
     )
-    parser.add_argument("-c", "--ckpt", default="/home/zhognli/YOLOX/YOLOX_outputs/debug/latest_ckpt.pth", type=str, help="ckpt for eval")
+    parser.add_argument("-c", "--ckpt", default="/home/zhognli/YOLOX/YOLOX_outputs/balance_weight/latest_ckpt.pth", type=str, help="ckpt for eval")
     parser.add_argument(
         "--device",
         default="gpu",
