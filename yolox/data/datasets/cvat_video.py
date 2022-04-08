@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from yolox.evaluators.voc_eval import voc_eval
 
 from .datasets_wrapper import Dataset
+from yolox.data import TrainTransform
 
 class CVATVideoDataset(Dataset):
     """
@@ -256,7 +257,7 @@ class CVATVideoDataset(Dataset):
         degrees=10,
         translate=0.1,
         scales=0.1,
-        shear=10,
+        shear=1,
     ):
     
         mask_size = (target_size[0] // mask_scale, target_size[1] // mask_scale)
@@ -429,7 +430,14 @@ class CVATVideoDataset(Dataset):
         print(img.shape)
         print(mask.shape)
         print(bboxes.shape)
-        print(bboxes)
+        if img.shape[0] == 3:
+            img = np.ascontiguousarray(img.transpose((1, 2, 0)))
+            mask = mask.transpose((1, 2, 0))
+            bboxes = bboxes[bboxes.sum(axis=1)!=0][:, 1:]
+            bboxes[:, 0], bboxes[:, 2] = bboxes[:, 0] - bboxes[:, 2] / 2, bboxes[:, 0] + bboxes[:, 2] / 2
+            bboxes[:, 1], bboxes[:, 3] = bboxes[:, 1] - bboxes[:, 3] / 2, bboxes[:, 1] + bboxes[:, 3] / 2
+            print(bboxes)
+            
         # draw bboxes
         for bbox in bboxes:
             pt1, pt2 = (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3]))
@@ -449,14 +457,24 @@ class CVATVideoDataset(Dataset):
 
         cv2.imwrite("visual_data_sample.png", mixup_img)
         cv2.imwrite("mask.png", mask[:, :, 0])
+        cv2.imwrite("mask_loss.png", mask[:, :, 1]*255)
             
 if __name__ == "__main__":
-    xml_file = "/home/zhognli/YOLOX/datasets/spindle/train_set/annotations.xml"
-    img_dir  = "/home/zhognli/YOLOX/datasets/spindle/train_set/images"
-    dataset = CVATVideoDataset(img_dir=img_dir, anno_path=xml_file)
-    for idx in range(len(dataset)):
-        dataset.visual_data_sample(idx)
-
+    xml_file = "/home/zhognli/YOLOX/datasets/spindle/test_set/annotations.xml"
+    img_dir  = "/home/zhognli/YOLOX/datasets/spindle/test_set/images"
+    dataset = CVATVideoDataset(img_dir=img_dir, 
+                       anno_path=xml_file, 
+                       img_size=(640, 640),
+                       preproc=TrainTransform(
+                           max_labels=50,
+                           flip_prob=0.5,
+                           hsv_prob=0
+                       ),
+                       mosaic=False,
+                       mode="train")
+    # for idx in range(len(dataset)):
+    #     dataset.visual_data_sample(idx)
+    dataset.visual_data_sample()
     # # dataset self checking
     # for idx in range(len(dataset)):
     #     img, mask, bbox, points = dataset[idx]

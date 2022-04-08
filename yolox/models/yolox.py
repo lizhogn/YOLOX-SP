@@ -46,11 +46,11 @@ class YOLOX(nn.Module):
             mask_loss = self.mask_head(mask_features, target_mask)
             # mask_loss = torch.tensor([0])
             # total_loss = mask_loss
-            # total_loss1 = det_loss + 10.0 * mask_loss
+            total_loss = det_loss + 10.0 * mask_loss
             # total_loss = torch.exp(-self.l_obj) * det_loss + torch.exp(-self.l_reg) * mask_loss + \
             #             (self.l_obj + self.l_reg)
-            total_loss = 0.5 / (self.params[0] ** 2) * det_loss + torch.log(1 + self.params[0] ** 2) + \
-                0.5 / (self.params[1] ** 2) * mask_loss + torch.log(1 + self.params[1] ** 2)
+            # total_loss = 0.5 / (self.params[0] ** 2) * det_loss + torch.log(1 + self.params[0] ** 2) + \
+            #     0.5 / (self.params[1] ** 2) * mask_loss + torch.log(1 + self.params[1] ** 2)
                 
             # total_loss = det_loss
             loss_outputs = {

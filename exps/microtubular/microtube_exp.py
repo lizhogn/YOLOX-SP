@@ -27,8 +27,8 @@ class Exp(MyExp):
         self.multiscale_range = 0
         # You can uncomment this line to specify a multiscale range
         # self.random_size = (14, 26)
-        self.train_img_dir = "/home/zhognli/YOLOX/datasets/spindle/train_set/images"
-        self.train_anno_path = "/home/zhognli/YOLOX/datasets/spindle/train_set/annotations.xml"
+        self.train_img_dir = "/home/zhognli/YOLOX/datasets/spindle/test_set/images"
+        self.train_anno_path = "/home/zhognli/YOLOX/datasets/spindle/test_set/annotations.xml"
         self.val_img_dir = "/home/zhognli/YOLOX/datasets/spindle/test_set/images"
         self.val_anno_path = "/home/zhognli/YOLOX/datasets/spindle/test_set/annotations.xml"
 
@@ -40,9 +40,10 @@ class Exp(MyExp):
         self.flip_prob = 0.5
         self.degrees = 10.0
         self.translate = 0.1
-        self.mosaic_scale = (0.1, 2)
+        self.mosaic_scale = (0.7, 1.3)
         self.mixup_scale = (0.5, 1.5)
         self.shear = 2.0
+        self.enable_mosaic = False
         self.enable_mixup = False
 
         # --------------  training config --------------------- #
@@ -59,7 +60,7 @@ class Exp(MyExp):
         self.weight_decay = 5e-4
         self.momentum = 0.9
         self.print_interval = 10
-        self.eval_interval = 1
+        self.eval_interval = 10
         self.exp_name = os.path.split(os.path.realpath(__file__))[1].split(".")[0]
 
         # -----------------  testing config ------------------ #

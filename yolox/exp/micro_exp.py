@@ -50,6 +50,7 @@ class Exp(BaseExp):
         self.mosaic_scale = (0.1, 2)
         self.mixup_scale = (0.5, 1.5)
         self.shear = 2.0
+        self.enable_mosaic = True
         self.enable_mixup = True
 
         # --------------  training config --------------------- #
@@ -125,7 +126,7 @@ class Exp(BaseExp):
                                         max_labels=50,
                                         flip_prob=self.flip_prob,
                                         hsv_prob=self.hsv_prob),
-                                    mosaic=not(no_aug),
+                                    mosaic=self.enable_mosaic,
                                     mode="train")
 
         if is_distributed:

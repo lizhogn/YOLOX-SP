@@ -207,13 +207,14 @@ class Trainer:
             else:
                 self.model.det_head.use_l1 = True
             self.exp.eval_interval = 1
+            self.train_loader.dataset.mosaic = False
             if not self.no_aug:
                 self.save_ckpt(ckpt_name="last_mosaic_epoch")
 
     def after_epoch(self):
         self.save_ckpt(ckpt_name="latest")
 
-        if (self.epoch) % self.exp.eval_interval == 0:
+        if (self.epoch) % self.exp.eval_interval == 0 and (self.epoch > self.exp.warmup_epochs):
             all_reduce_norm(self.model)
             self.evaluate_and_save_model()
 

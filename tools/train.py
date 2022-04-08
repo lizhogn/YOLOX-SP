@@ -17,7 +17,7 @@ from yolox.utils import configure_nccl, configure_omp, get_num_devices
 
 def make_parser():
     parser = argparse.ArgumentParser("YOLOX train parser")
-    parser.add_argument("-expn", "--experiment-name", type=str, default="train_set")
+    parser.add_argument("-expn", "--experiment-name", type=str, default="debug")
     parser.add_argument("-n", "--name", type=str, default="yolox_s", help="model name")
 
     # distributed
@@ -42,7 +42,7 @@ def make_parser():
         help="plz input your experiment description file",
     )
     parser.add_argument(
-        "--resume", default=True, action="store_true", help="resume training"
+        "--resume", default=False, action="store_true", help="resume training"
     )
     parser.add_argument(
         "-c", "--ckpt", 
