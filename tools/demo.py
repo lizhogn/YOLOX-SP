@@ -26,7 +26,7 @@ def make_parser():
     parser.add_argument(
         "--demo", default="image", help="demo type, eg. image, video and webcam"
     )
-    parser.add_argument("-expn", "--experiment-name", type=str, default="debug")
+    parser.add_argument("-expn", "--experiment-name", type=str, default="total_data")
     parser.add_argument("-n", "--name", type=str, default="yolox_s", help="model name")
 
     parser.add_argument(
@@ -44,11 +44,11 @@ def make_parser():
     parser.add_argument(
         "-f",
         "--exp_file",
-        default="/home/zhognli/YOLOX/exps/microtubular/microtube_exp.py",
+        default="/home/zhognli/YOLOX/exps/microtubular/task_exp.py",
         type=str,
         help="pls input your experiment description file",
     )
-    parser.add_argument("-c", "--ckpt", default="/home/zhognli/YOLOX/YOLOX_outputs/debug/latest_ckpt.pth", type=str, help="ckpt for eval")
+    parser.add_argument("-c", "--ckpt", default="/home/zhognli/YOLOX/YOLOX_outputs/total_data/latest_ckpt.pth", type=str, help="ckpt for eval")
     parser.add_argument(
         "--device",
         default="gpu",
@@ -56,7 +56,7 @@ def make_parser():
         help="device to run our model, can either be cpu or gpu",
     )
     parser.add_argument("--conf", default=0.3, type=float, help="test conf")
-    parser.add_argument("--nms", default=0.3, type=float, help="test nms threshold")
+    parser.add_argument("--nms", default=0.5, type=float, help="test nms threshold")
     parser.add_argument("--tsize", default=None, type=int, help="test img size")
     parser.add_argument(
         "--fp16",

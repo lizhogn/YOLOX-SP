@@ -113,8 +113,10 @@ class CVATEvaluator:
         # badcase analysis
         self.badcase_dict = {}
 
+        unmatched_gt_cnt = 0
+
         for cur_iter, (imgs, bboxes, points, img_info) in enumerate(
-            progress_bar(self.dataloader)
+            self.dataloader
         ):
             with torch.no_grad():
                 imgs = imgs.type(tensor_type)
@@ -141,6 +143,9 @@ class CVATEvaluator:
 
             # badcase
             img_name = os.path.basename(img_info["img_name"][0])
+            if img_name in self.badcase_dict:
+                img_name = str(cur_iter) + "_" + img_name
+                
             self.badcase_dict[img_name] = {
                 "img_path": img_info["img_path"][0],
                 "detection": {
@@ -153,6 +158,10 @@ class CVATEvaluator:
                 "mag_rate": img_info["ratio"][0].item()
             }
 
+            if len(unmatched_gt) > 0:
+                unmatched_gt_cnt += len(unmatched_gt)
+                
+
         # detections
         det_precision = round(total_correct / (total_dt + 1e-10), 3)
         det_recall = round(total_correct / (total_gt + 1e-10), 3)
@@ -160,13 +169,20 @@ class CVATEvaluator:
         # endpoints
         mask_recall = round(points_recall / (points_gt + 1e-10), 3)
 
-        return {
+        pr_metric = {
             "detection": {
                 "precision": det_precision,
                 "recall": det_recall
             },
+            "det_cnt":{
+                "total_dt": total_dt,
+                "total_gt": total_gt,
+                "total_correct": total_correct
+            },
             "endpoints": mask_recall
         }
+
+        return pr_metric
     
 
     def detection_eval(self, dt, gt, iou_thre=0.5):
@@ -212,9 +228,13 @@ class CVATEvaluator:
 
         mask = cv2.resize(mask, input_size)
         dt = convert_mask_to_points(mask)
+
         total_dt = len(dt)
         total_gt = len(gt)
         correct = 0
+
+        if total_dt == 0:
+            return 0, total_gt, gt
 
         gt_pts = np.expand_dims(np.stack(gt, axis=0), 0)
         dt_pts = np.expand_dims(np.stack(dt, axis=0), 1)

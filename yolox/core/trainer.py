@@ -121,7 +121,7 @@ class Trainer:
             self.ema_model.update(self.model)
 
         lr = self.lr_scheduler.update_lr(self.progress_in_iter + 1)
-        for param_group in self.optimizer.param_groups:
+        for param_group in self.optimizer.param_groups[:2]:
             param_group["lr"] = lr
 
         iter_end_time = time.time()

@@ -187,7 +187,7 @@ class Exp(BaseExp):
             else:
                 lr = self.basic_lr_per_img * batch_size
 
-            pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
+            pg0, pg1, pg2, pg_w= [], [], [], []  # optimizer parameter groups
 
             for k, v in self.model.named_modules():
                 if hasattr(v, "bias") and isinstance(v.bias, nn.Parameter):
@@ -196,9 +196,11 @@ class Exp(BaseExp):
                     pg0.append(v.weight)  # no decay
                 elif hasattr(v, "weight") and isinstance(v.weight, nn.Parameter):
                     pg1.append(v.weight)  # apply decay
+                if k == "automatic_weighted_loss":
+                    pg_w.append(v.params)
             
-            pg_weight = []
-            pg_weight.append(self.model.state_dict()["params"])
+            # pg_weight = []
+            # pg_weight.append(self.model.state_dict()["params"])
 
             optimizer = torch.optim.SGD(
                 pg0, lr=lr, momentum=self.momentum, nesterov=True
@@ -207,7 +209,7 @@ class Exp(BaseExp):
                 {"params": pg1, "weight_decay": self.weight_decay}
             )  # add pg1 with weight_decay
             optimizer.add_param_group({"params": pg2})
-            optimizer.add_param_group({"params": pg_weight, "lr": 0.1})
+            optimizer.add_param_group({"params": pg_w, "lr": 0.01})
             self.optimizer = optimizer
 
         return self.optimizer

@@ -17,7 +17,7 @@ from yolox.utils import configure_nccl, configure_omp, get_num_devices
 
 def make_parser():
     parser = argparse.ArgumentParser("YOLOX train parser")
-    parser.add_argument("-expn", "--experiment-name", type=str, default="debug")
+    parser.add_argument("-expn", "--experiment-name", type=str, default="mini_data20")
     parser.add_argument("-n", "--name", type=str, default="yolox_s", help="model name")
 
     # distributed
@@ -30,14 +30,14 @@ def make_parser():
         type=str,
         help="url used to set up distributed training"
     )
-    parser.add_argument("-b", "--batch-size", type=int, default=4, help="batch size")
+    parser.add_argument("-b", "--batch-size", type=int, default=2, help="batch size")
     parser.add_argument(
         "-d", "--devices", default=None, type=int, help="device for training"
     )
     parser.add_argument(
         "-f",
         "--exp_file",
-        default="/home/zhognli/YOLOX/exps/microtubular/microtube_exp.py",
+        default="/home/zhognli/YOLOX/exps/mini_data/mini_data20.py",
         type=str,
         help="plz input your experiment description file",
     )
@@ -46,7 +46,7 @@ def make_parser():
     )
     parser.add_argument(
         "-c", "--ckpt", 
-        default="/home/zhognli/YOLOX/YOLOX_outputs/debug/latest_ckpt.pth", 
+        default=None, 
         type=str, 
         help="checkpoint file"
     )

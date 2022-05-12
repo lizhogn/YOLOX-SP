@@ -9,3 +9,4 @@ from .mosaicdetection import MosaicDetection
 from .voc import VOCDetection
 from .microtube import VOCDetSegDataset
 from .cvat_video import CVATVideoDataset
+from .cvat_task import CVATTaskDataset

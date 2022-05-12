@@ -8,6 +8,7 @@ import torch.nn as nn
 from .yolo_head import YOLOXHead
 from .yolo_pafpn import YOLOPAFPN
 from .unet_head import HeatMapHead
+from .losses import AutomaticWeightedLoss
 
 
 class YOLOX(nn.Module):
@@ -29,11 +30,7 @@ class YOLOX(nn.Module):
         self.backbone = backbone
         self.det_head = det_head
         self.mask_head = mask_head
-
-        # loss balancing
-        # params = torch.ones(2, requires_grad=True)
-        params = torch.tensor([1.0, 0.33], requires_grad=True)
-        self.params = torch.nn.Parameter(params)
+        self.automatic_weighted_loss = AutomaticWeightedLoss(2)
 
     def forward(self, x, targets=None, target_mask=None):
         # fpn output content features of [stem, dark2, dark3, dark4, dark5]
@@ -50,11 +47,14 @@ class YOLOX(nn.Module):
             # total_loss = det_loss + 10.0 * mask_loss
             # total_loss = torch.exp(-self.l_obj) * det_loss + torch.exp(-self.l_reg) * mask_loss + \
             #             (self.l_obj + self.l_reg)
-            total_loss = 0.5 / (self.params[0] ** 2) * det_loss + torch.log(1 + self.params[0] ** 2) + \
-                         0.5 / (self.params[1] ** 2) * mask_loss + torch.log(1 + self.params[1] ** 2)
-
-            w_det = (0.5 / (self.params[0] ** 2)).detach().cpu().numpy()
-            w_mask = (0.5 / (self.params[1] ** 2)).detach().cpu().numpy()
+            # total_loss = 0.5 / (self.params[0] ** 2) * det_loss + torch.log(1 + self.params[0] ** 2) + \
+            #              0.5 / (self.params[1] ** 2) * mask_loss + torch.log(1 + self.params[1] ** 2)
+            total_loss = self.automatic_weighted_loss(det_loss, mask_loss)
+            
+            p_det = self.automatic_weighted_loss.params[0].detach().cpu().numpy()
+            p_mask = self.automatic_weighted_loss.params[1].detach().cpu().numpy()
+            w_det = 0.5 / (p_det ** 2)
+            w_mask = 0.5 / (p_mask ** 2)
                 
             # total_loss = det_loss
             loss_outputs = {

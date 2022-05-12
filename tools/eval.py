@@ -19,7 +19,7 @@ from yolox.utils import configure_nccl, fuse_model, get_local_rank, get_model_in
 
 def make_parser():
     parser = argparse.ArgumentParser("YOLOX Eval")
-    parser.add_argument("-expn", "--experiment-name", default="debug", type=str)
+    parser.add_argument("-expn", "--experiment-name", default="mini_data20", type=str)
     parser.add_argument("-n", "--name", type=str, default="yolox_s", help="model name")
 
     # distributed
@@ -45,17 +45,17 @@ def make_parser():
     parser.add_argument(
         "-f",
         "--exp_file",
-        default="/home/zhognli/YOLOX/exps/microtubular/microtube_exp.py",
+        default="/home/zhognli/YOLOX/exps/mini_data/mini_data20.py",
         type=str,
         help="pls input your expriment description file",
     )
     parser.add_argument(
         "--badcase",
-        default=True,
+        default=False,
         type=bool,
         help="whether to start badcase analysis"
     )
-    parser.add_argument("-c", "--ckpt", default="/home/zhognli/YOLOX/YOLOX_outputs/debug/latest_ckpt.pth", type=str, help="ckpt for eval")
+    parser.add_argument("-c", "--ckpt", default="/home/zhognli/YOLOX/YOLOX_outputs/mini_data20/latest_ckpt.pth", type=str, help="ckpt for eval")
     parser.add_argument("--conf", default=0.3, type=float, help="test conf")
     parser.add_argument("--nms", default=0.5, type=float, help="test nms threshold")
     parser.add_argument("--tsize", default=640, type=int, help="test img size")
