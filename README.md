@@ -41,6 +41,12 @@ The format of the `annotation.xml` tag is shown below.
   </track>
 ```
 
+The tiny S.pombe dataset is release at [Google Drive](https://drive.google.com/drive/folders/1wbNVWJEVr-FFH9Znp1XXGf_kRbN-wMTL?usp=sharing)
+
+We support single or multiple task dataset class:
+- single task: `yolox/data/datasets/cvat_video.py`
+- multiple task: `yolox/data/datasets/cvat_task.py`
+
 ### 3. Dataset Script
 We re-wrote a Dataset loading script (whose script path is `yolox/data/datasets/cvat_video.py`) to apply to the loading of the cvat_video dataset. `__getitem__` returns the following data: Image, BBox, Mask as follows.
 
