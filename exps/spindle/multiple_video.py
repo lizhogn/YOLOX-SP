@@ -36,28 +36,22 @@ class Exp(MyExp):
         # self.random_size = (14, 26)
         self.train_img_dir = [
             "datasets/S_pombe/each_task/task1/images",
-            "datasets/S_pombe/each_task/task2/images",
             "datasets/S_pombe/each_task/task3/images",
-            "datasets/S_pombe/each_task/task4/images",
             "datasets/S_pombe/each_task/task5/images",
-            "datasets/S_pombe/each_task/task6/images",
         ]
         self.train_anno_path = [
             "datasets/S_pombe/each_task/task1/annotations.xml",
-            "datasets/S_pombe/each_task/task2/annotations.xml",
             "datasets/S_pombe/each_task/task3/annotations.xml",
-            "datasets/S_pombe/each_task/task4/annotations.xml",
             "datasets/S_pombe/each_task/task5/annotations.xml",
-            "datasets/S_pombe/each_task/task6/annotations.xml",
         ]
         self.val_img_dir = [
+            "datasets/S_pombe/each_task/task2/images",
             "datasets/S_pombe/each_task/task4/images",
-            "datasets/S_pombe/each_task/task5/images",
             "datasets/S_pombe/each_task/task6/images",
         ]
         self.val_anno_path = [
+            "datasets/S_pombe/each_task/task2/annotations.xml",
             "datasets/S_pombe/each_task/task4/annotations.xml",
-            "datasets/S_pombe/each_task/task5/annotations.xml",
             "datasets/S_pombe/each_task/task6/annotations.xml",
         ]
 
