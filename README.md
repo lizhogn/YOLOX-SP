@@ -48,9 +48,11 @@ The format of the `annotation.xml` tag is shown below.
 
 The tiny S.pombe dataset is release at [Google Drive](https://drive.google.com/drive/folders/1wbNVWJEVr-FFH9Znp1XXGf_kRbN-wMTL?usp=sharing)
 
-We support single or multiple task dataset class:
-- single task: `yolox/data/datasets/cvat_video.py`
-- multiple task: `yolox/data/datasets/cvat_task.py`
+Dataset loader way:
+```bsah
+yolox/data/datasets/cvat_video.py   ->   exps/spindle/multiple_video.py
+yolox/data/datasets/cvat_task.py    ->   exps/spindle/multiple_task.py
+```
 
 ### 3. Dataset Script
 We re-wrote a Dataset loading script (whose script path is `yolox/data/datasets/cvat_video.py`) to apply to the loading of the cvat_video dataset. `__getitem__` returns the following data: Image, BBox, Mask as follows.
@@ -62,23 +64,32 @@ We re-wrote a Dataset loading script (whose script path is `yolox/data/datasets/
 
 
 ## Train Model
-Once you have processed the data, you can train the model. First you need to set up the training set, validation set path, model parameters and other information under the exp file. exp file path: exps/microtubular/microtube_exp.py
+Once you have processed the data, you can train the model. First you need to set up the training set, validation set path in `exps/spindle/multiple_video.py` or `exps/spindle/multiple_task.py`, more model parameters and other information is under the exp file (exp file path: `exps/microtubular/microtube_exp.py`).
 
 Then you can just run:
 ```bash
 python tools/train.py \
 --experiment-name spindle_det \
 --batch-size 4 \
---exp_file exps/microtubular/microtube_exp.py \
+--exp_file exps/spindle/multiple_video.py \
 ```
 
+## Eval Model
+```bash
+python tools/eval.py \
+--exp_file exps/spindle/multiple_video.py \
+--experiment-name spindle_det \
+--ckpt YOLOX_outputs/segment/latest_ckpt.pth
+```
 
 ## Deploy Model
 
 You can deploy the model (exported in ONNX format to provide inference to the SpindleTracker project) with the following runtime script.
 ```bash
 python tools/export_onnx.py \
---exp_file exps/microtubular/microtube_exp.py \
---ckpt YOLOX_outputs/total_data/latest_ckpt.pth \
+--exp_file exps/spindle/multiple_video.py  \
+--ckpt YOLOX_outputs/segment/latest_ckpt.pth \
 --dynamic
 ```
+
+The pretraining model and the deployed model were released at [Google Drive](https://drive.google.com/drive/folders/10vmx99pvxqdgJWrtA6rN_10GCRJepimU?usp=share_link)

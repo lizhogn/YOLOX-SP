@@ -16,6 +16,7 @@ import torch
 from scipy.optimize import linear_sum_assignment
 from findmaxima2d import find_maxima, find_local_maxima 
 import cv2
+from tqdm import tqdm
 
 from yolox.utils import (
     gather,
@@ -116,7 +117,7 @@ class CVATEvaluator:
         unmatched_gt_cnt = 0
 
         for cur_iter, (imgs, bboxes, points, img_info) in enumerate(
-            self.dataloader
+            tqdm(self.dataloader)
         ):
             with torch.no_grad():
                 imgs = imgs.type(tensor_type)

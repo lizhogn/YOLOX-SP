@@ -45,7 +45,7 @@ def make_parser():
     parser.add_argument(
         "-f",
         "--exp_file",
-        default="/home/zhognli/YOLOX/exps/mini_data/mini_data20.py",
+        default="",
         type=str,
         help="pls input your expriment description file",
     )
@@ -55,7 +55,7 @@ def make_parser():
         type=bool,
         help="whether to start badcase analysis"
     )
-    parser.add_argument("-c", "--ckpt", default="/home/zhognli/YOLOX/YOLOX_outputs/mini_data20/latest_ckpt.pth", type=str, help="ckpt for eval")
+    parser.add_argument("-c", "--ckpt", default="YOLOX_outputs/spindle/latest_ckpt.pth", type=str, help="ckpt for eval")
     parser.add_argument("--conf", default=0.3, type=float, help="test conf")
     parser.add_argument("--nms", default=0.5, type=float, help="test nms threshold")
     parser.add_argument("--tsize", default=640, type=int, help="test img size")
@@ -190,9 +190,7 @@ def main(exp, args, num_gpu):
     summary = evaluator.evaluate(
         model, is_distributed, args.fp16, trt_file, decoder, exp.test_size
     )
-    logger.info("Detection branch metric: Precision: {}, Recall: {}".format(
-            summary["detection"]["precision"], summary["detection"]["recall"]))
-    logger.info("Endpoints branch metric: Recall: {}".format(summary["endpoints"]))
+    logger.info(summary)
 
     if args.badcase:
         save_badcase = os.path.join(file_name, "badcase")
