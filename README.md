@@ -5,6 +5,11 @@ YOLOX-SP is based on YOLOX, if you not familiar with YOLOX, you can first look a
 
 First, you need to refer to the YOLOX documentation to install the corresponding environment and make sure that YOLOX can run on it. Then, we will describe the usage of YOLOX-SP.
 
+After install the requirements, run this to turn the project into development mode
+```
+pip install -e .
+```
+
 ### 1. YOLOX-SP Architecture
 
 We added a branch of Heatmap regression to YOLOX with the following model structure diagram.

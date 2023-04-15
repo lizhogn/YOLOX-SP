@@ -176,6 +176,7 @@ class CVATTaskDataset(Dataset):
         mask = self._mask_generate(bboxes, points, hw_resize, scale=self.mask_scale)
 
         img_info = {
+            "img_id": idx,
             "img_name": img_name,
             "img_path": img_path,
             "hw_origin": hw_origin,

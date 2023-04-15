@@ -214,7 +214,8 @@ class Trainer:
     def after_epoch(self):
         self.save_ckpt(ckpt_name="latest")
 
-        if (self.epoch) % self.exp.eval_interval == 0 and (self.epoch > self.exp.warmup_epochs):
+        # if (self.epoch) % self.exp.eval_interval == 0 and (self.epoch > self.exp.warmup_epochs):
+        if (self.epoch) % self.exp.eval_interval == 0:
             # all_reduce_norm(self.model)
             self.evaluate_and_save_model()
 
@@ -320,9 +321,7 @@ class Trainer:
             evalmodel, self.evaluator, self.is_distributed
         )
         
-        logger.info("Detection branch metric: Precision: {}, Recall: {}".format(
-                summary["detection"]["precision"], summary["detection"]["recall"]))
-        logger.info("Endpoints branch metric: Recall: {}".format(summary["endpoints"]))
+        logger.info(summary)
         self.model.train()
 
     def save_ckpt(self, ckpt_name, update_best_ckpt=False):

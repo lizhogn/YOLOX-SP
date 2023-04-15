@@ -35,8 +35,8 @@ class CVATVideoDataset(Dataset):
     """
     def __init__(
         self,
-        img_dir,
-        anno_path,
+        imgs_dir_list,
+        anno_path_list,
         img_size=(640, 640),
         preproc=None,
         mosaic=False,
@@ -44,17 +44,18 @@ class CVATVideoDataset(Dataset):
         # target_transform=AnnotationTransform()
     ):
         super().__init__(img_size)
-        self.img_dir = img_dir
-        self.anno_path = anno_path
+        self.imgs_dir_list = imgs_dir_list
+        self.anno_path_list = anno_path_list
         self.img_size = img_size    # (img_h, img_w)
         self.mask_scale = 4
         self.preproc = preproc
         self.mosaic = mosaic
         self.mode = mode
+        self.samples = None
         
         # load the annotation data
         self.annotations = self._load_annotations()
-        
+
     def _load_annotations(self):
         """parser the xml annotation file
         Output annotation format:
@@ -72,8 +73,24 @@ class CVATVideoDataset(Dataset):
             }
 
         """
+        assert len(self.imgs_dir_list) == len(self.anno_path_list), "The number of images and annotations are not equal!"
+
+        annotation_list = []
+        for img_dir, anno_path in zip(self.imgs_dir_list, self.anno_path_list):
+            annotation_data = self.xml_parser(anno_path, img_dir)
+            annotation_list.extend(annotation_data)
+
+        if self.samples and self.mode == "train":
+            if self.samples <= len(annotation_list):
+                anno_len = len(annotation_list)
+                select_idx = np.linspace(0, anno_len - 1, self.samples, dtype=np.int)
+                annotation_list = [x for i, x in enumerate(annotation_list) if i in select_idx]
+        
+        return annotation_list
+        
+    def xml_parser(self, anno_path, img_dir):
         # step1: load the xml file
-        xml_root = ET.parse(self.anno_path).getroot()
+        xml_root = ET.parse(anno_path).getroot()
         anno_data = {}
 
         # step2: parse the xml file
@@ -91,7 +108,7 @@ class CVATVideoDataset(Dataset):
                 img_name = "frame_{:0>6d}.PNG".format(int(frame_id))
                 is_outside = True if frame.attrib["outside"] == "1" else False
                 
-                img_path = os.path.join(self.img_dir, img_name)
+                img_path = os.path.join(img_dir, img_name)
                 if not os.path.exists(img_path):
                     continue
 
@@ -100,6 +117,7 @@ class CVATVideoDataset(Dataset):
                     if frame_id not in anno_data:
                         anno_data[frame_id] = {
                             "img_name": img_name,
+                            "img_path": img_path,
                             "bboxes": [],
                             "points": [],
                             "bboxes_id": [],
@@ -132,7 +150,7 @@ class CVATVideoDataset(Dataset):
     def pull_item(self, idx):
         cur_anno = self.annotations[idx]
         img_name = cur_anno["img_name"]
-        img_path = os.path.join(self.img_dir, img_name)
+        img_path = self.annotations[idx]["img_path"]
         
         # load the img
         img, hw_origin, hw_resize, r = self.load_image(img_path)
@@ -148,6 +166,7 @@ class CVATVideoDataset(Dataset):
         mask = self._mask_generate(bboxes, points, hw_resize, scale=self.mask_scale)
 
         img_info = {
+            "img_id": idx,
             "img_name": img_name,
             "img_path": img_path,
             "hw_origin": hw_origin,

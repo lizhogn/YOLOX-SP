@@ -35,19 +35,22 @@ class Exp(MyExp):
         # You can uncomment this line to specify a multiscale range
         # self.random_size = (14, 26)
         self.tasks_dir = [
-            "/home/zhognli/YOLOX/datasets/total/each_task/task1",
-            "/home/zhognli/YOLOX/datasets/total/each_task/task3"
+            "datasets/S_pombe/each_task/task1",
+            "datasets/S_pombe/each_task/task2",
+            "datasets/S_pombe/each_task/task3",
+            "datasets/S_pombe/each_task/task4",
+            "datasets/S_pombe/each_task/task5",
+            "datasets/S_pombe/each_task/task6",
         ]
         self.train_imgs_name = "test"
         self.train_anno_name = "annotations.xml"
         self.val_imgs_name = "train"
         self.val_anno_name = "annotations.xml"
-        self.sample_num = 100
 
         # --------------- transform config ----------------- #
-        self.mosaic_prob = 0
-        self.mixup_prob = 0
-        self.hsv_prob = 0
+        self.mosaic_prob = 1.0
+        self.mixup_prob = 1.0
+        self.hsv_prob = 1.0
         self.del_green_prob = 0.5
         self.flip_prob = 0.5
         self.degrees = 10.0
@@ -71,14 +74,14 @@ class Exp(MyExp):
 
         self.weight_decay = 5e-4
         self.momentum = 0.9
-        self.print_interval = 10
-        self.eval_interval = 10
+        self.print_interval = 1
+        self.eval_interval = 1
         self.exp_name = os.path.split(os.path.realpath(__file__))[1].split(".")[0]
 
         # -----------------  testing config ------------------ #
         self.test_size = (640, 640)
         self.test_conf = 0.2
-        self.nmsthre = 0.65
+        self.nmsthre = 0.3
 
     def get_data_loader(
         self, batch_size, is_distributed, no_aug=False, cache_img=False
@@ -106,8 +109,7 @@ class Exp(MyExp):
                         flip_prob=0.5,
                         hsv_prob=0),
                 mosaic=True,
-                mode="train",    # "train" or "eval"
-                samples=self.sample_num
+                mode="train"    # "train" or "eval"
             )
 
         if is_distributed:

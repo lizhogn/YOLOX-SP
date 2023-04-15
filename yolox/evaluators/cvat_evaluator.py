@@ -198,6 +198,9 @@ class CVATEvaluator:
         iou_matrix = get_iou_matrix(gt, dt)
 
         # Hungrian match
+        # set the invalid numeric entrics to 0
+        iou_matrix = np.nan_to_num(iou_matrix, nan=0)
+        iou_matrix[iou_matrix != iou_matrix] = 0
         x, y = linear_sum_assignment(-iou_matrix)
         matched_indices = np.array(list(zip(x, y)))
         

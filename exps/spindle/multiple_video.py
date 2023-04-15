@@ -34,20 +34,37 @@ class Exp(MyExp):
         self.multiscale_range = 0
         # You can uncomment this line to specify a multiscale range
         # self.random_size = (14, 26)
-        self.tasks_dir = [
-            "/home/zhognli/YOLOX/datasets/total/each_task/task1",
-            "/home/zhognli/YOLOX/datasets/total/each_task/task3"
+        self.train_img_dir = [
+            "datasets/S_pombe/each_task/task1/images",
+            "datasets/S_pombe/each_task/task2/images",
+            "datasets/S_pombe/each_task/task3/images",
+            "datasets/S_pombe/each_task/task4/images",
+            "datasets/S_pombe/each_task/task5/images",
+            "datasets/S_pombe/each_task/task6/images",
         ]
-        self.train_imgs_name = "test"
-        self.train_anno_name = "annotations.xml"
-        self.val_imgs_name = "train"
-        self.val_anno_name = "annotations.xml"
-        self.sample_num = 40
+        self.train_anno_path = [
+            "datasets/S_pombe/each_task/task1/annotations.xml",
+            "datasets/S_pombe/each_task/task2/annotations.xml",
+            "datasets/S_pombe/each_task/task3/annotations.xml",
+            "datasets/S_pombe/each_task/task4/annotations.xml",
+            "datasets/S_pombe/each_task/task5/annotations.xml",
+            "datasets/S_pombe/each_task/task6/annotations.xml",
+        ]
+        self.val_img_dir = [
+            "datasets/S_pombe/each_task/task4/images",
+            "datasets/S_pombe/each_task/task5/images",
+            "datasets/S_pombe/each_task/task6/images",
+        ]
+        self.val_anno_path = [
+            "datasets/S_pombe/each_task/task4/annotations.xml",
+            "datasets/S_pombe/each_task/task5/annotations.xml",
+            "datasets/S_pombe/each_task/task6/annotations.xml",
+        ]
 
         # --------------- transform config ----------------- #
-        self.mosaic_prob = 0
-        self.mixup_prob = 0
-        self.hsv_prob = 0
+        self.mosaic_prob = 1.0
+        self.mixup_prob = 1.0
+        self.hsv_prob = 1.0
         self.del_green_prob = 0.5
         self.flip_prob = 0.5
         self.degrees = 10.0
@@ -60,9 +77,9 @@ class Exp(MyExp):
 
         # --------------  training config --------------------- #
         self.warmup_epochs = 5
-        self.max_epoch = 300
+        self.max_epoch = 150
         self.warmup_lr = 0
-        self.basic_lr_per_img = 0.01 / 64.0
+        self.basic_lr_per_img = 0.001
         self.scheduler = "yoloxwarmcos"
         self.no_aug_epochs = 15
         self.min_lr_ratio = 0.05
@@ -71,20 +88,20 @@ class Exp(MyExp):
 
         self.weight_decay = 5e-4
         self.momentum = 0.9
-        self.print_interval = 10
-        self.eval_interval = 10
+        self.print_interval = 1
+        self.eval_interval = 1
         self.exp_name = os.path.split(os.path.realpath(__file__))[1].split(".")[0]
 
         # -----------------  testing config ------------------ #
         self.test_size = (640, 640)
         self.test_conf = 0.2
-        self.nmsthre = 0.65
+        self.nmsthre = 0.3
 
     def get_data_loader(
         self, batch_size, is_distributed, no_aug=False, cache_img=False
     ):
         from yolox.data import (
-            CVATTaskDataset,
+            CVATVideoDataset,
             TrainTransform,
             worker_init_reset_seed,
         )
@@ -96,18 +113,16 @@ class Exp(MyExp):
         local_rank = get_local_rank()
 
         with wait_for_the_master(local_rank):
-            self.dataset = CVATTaskDataset(        
-                tasks_dir=self.tasks_dir,
-                imgs_name=self.train_imgs_name,
-                anno_name=self.train_anno_name,
+            self.dataset = CVATVideoDataset(        
+                imgs_dir_list=self.train_img_dir,
+                anno_path_list=self.train_anno_path,
                 img_size=(640, 640),
                 preproc=TrainTransform(
                         max_labels=50,
-                        flip_prob=0,
+                        flip_prob=0.5,
                         hsv_prob=0),
-                mosaic=False,
-                mode="train",    # "train" or "eval"
-                samples=self.sample_num
+                mosaic=True,
+                mode="train"    # "train" or "eval"
             )
 
         if is_distributed:
@@ -127,12 +142,11 @@ class Exp(MyExp):
         return train_loader
 
     def get_eval_loader(self, batch_size, is_distributed, testdev=False, legacy=False):
-        from yolox.data import CVATTaskDataset, ValTransform
+        from yolox.data import CVATVideoDataset, ValTransform
 
-        valdataset = CVATTaskDataset(
-            tasks_dir=self.tasks_dir,
-            imgs_name=self.val_imgs_name,
-            anno_name=self.val_anno_name,
+        valdataset = CVATVideoDataset(
+            imgs_dir_list=self.val_img_dir,
+            anno_path_list=self.val_anno_path,
             img_size=(640, 640),
             preproc=ValTransform(legacy=legacy),
             mosaic=False,
